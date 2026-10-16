@@ -24,5 +24,6 @@ interface Window {
     selectSaveFile: (defaultName: string) => Promise<string | null>;
     selectDownloadFolder: () => Promise<string | null>;
     selectBackgroundFile: () => Promise<{ url: string; type: 'video' | 'image' } | null>;
+    setProxy: (rule: string | null) => Promise<{ success: boolean; proxy?: string | null }>;
   };
 }

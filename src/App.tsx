@@ -119,6 +119,11 @@ function App() {
 
     audioService.setVolume(volume);
 
+    const savedProxy = localStorage.getItem('sc_proxy_rule');
+    if (savedProxy && window.electronAPI?.setProxy) {
+      window.electronAPI.setProxy(savedProxy);
+    }
+
     return () => {
       unsubAudio();
       unsubDownloads();

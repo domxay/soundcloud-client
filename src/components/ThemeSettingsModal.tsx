@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { themeService, THEME_PRESETS, BACKGROUND_PRESETS, CustomBackground } from '@/services/theme';
-import { X, Palette, Image as ImageIcon, Video, Check, Upload, Sliders, Sparkles } from 'lucide-react';
+import { X, Palette, Image as ImageIcon, Video, Check, Upload, Sliders, Sparkles, Shield, Globe, CheckCircle2 } from 'lucide-react';
 
 interface ThemeSettingsModalProps {
   isOpen: boolean;
@@ -8,10 +8,21 @@ interface ThemeSettingsModalProps {
 }
 
 export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<'themes' | 'background'>('themes');
+  const [activeTab, setActiveTab] = useState<'themes' | 'background' | 'network'>('themes');
   const [currentTheme, setCurrentTheme] = useState(themeService.getTheme());
   const [bgConfig, setBgConfig] = useState<CustomBackground>(themeService.getBackground());
   const [customUrl, setCustomUrl] = useState(bgConfig.url || '');
+  const [proxyInput, setProxyInput] = useState('');
+  const [activeProxy, setActiveProxy] = useState('');
+  const [proxyStatus, setProxyStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('sc_proxy_rule');
+    if (saved) {
+      setProxyInput(saved);
+      setActiveProxy(saved);
+    }
+  }, []);
 
   if (!isOpen) return null;
 
@@ -80,6 +91,22 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
     handleApplyBackground(cleared);
   };
 
+  const handleApplyProxy = async (proxyRule: string) => {
+    const clean = proxyRule.trim();
+    if (window.electronAPI?.setProxy) {
+      await window.electronAPI.setProxy(clean || null);
+    }
+    setActiveProxy(clean);
+    if (clean) {
+      localStorage.setItem('sc_proxy_rule', clean);
+      setProxyStatus('Proxy applied successfully!');
+    } else {
+      localStorage.removeItem('sc_proxy_rule');
+      setProxyStatus('Direct mode activated (Proxy disabled).');
+    }
+    setTimeout(() => setProxyStatus(null), 3000);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
       <div className="relative w-full max-w-2xl h-[700px] flex flex-col rounded-sc border border-sc-border bg-sc-surface shadow-2xl overflow-hidden">
@@ -87,8 +114,8 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
           <div className="flex items-center gap-3">
             <Palette className="text-sc-accent" size={24} />
             <div>
-              <h2 className="text-base font-bold text-white">Appearance & Theme Studio</h2>
-              <p className="text-xs text-sc-text-secondary">Custom themes, live backgrounds (GIF, Video, Images)</p>
+              <h2 className="text-base font-bold text-white">Appearance & Network Studio</h2>
+              <p className="text-xs text-sc-text-secondary">Custom themes, live backgrounds, and in-app bypass proxy</p>
             </div>
           </div>
 
@@ -118,7 +145,18 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
             }`}
           >
             <ImageIcon size={15} />
-            Custom Background (GIF / Video / Image)
+            Custom Background (GIF / Video)
+          </button>
+          <button
+            onClick={() => setActiveTab('network')}
+            className={`py-3 px-4 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
+              activeTab === 'network'
+                ? 'border-sc-accent text-sc-accent'
+                : 'border-transparent text-sc-text-secondary hover:text-white'
+            }`}
+          >
+            <Globe size={15} />
+            Bypass / Network (Без VPN)
           </button>
         </div>
 
@@ -161,7 +199,7 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                 );
               })}
             </div>
-          ) : (
+          ) : activeTab === 'background' ? (
             <div className="space-y-6">
               <div className="flex items-center justify-between pb-3 border-b border-sc-border">
                 <div>
@@ -286,6 +324,110 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                     onChange={(e) => handleApplyBackground({ ...bgConfig, blur: Number(e.target.value) })}
                     className="w-full accent-sc-accent h-1 bg-sc-border rounded-full"
                   />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between pb-3 border-b border-sc-border">
+                <div>
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Shield className="text-sc-accent" size={16} />
+                    Обход блокировок SoundCloud (Режим для РФ без системного VPN)
+                  </h4>
+                  <p className="text-xs text-sc-text-secondary mt-0.5">
+                    Позволяет слушать музыку и загружать треки напрямую внутри приложения без включения общего VPN на компьютере.
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-sc border border-sc-border bg-[#141414] p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-xs font-bold text-white">Встроенный DNS-over-HTTPS (DoH)</span>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-extrabold px-1.5 py-0.5 rounded">
+                    Активен
+                  </span>
+                </div>
+                <p className="text-xs text-sc-text-secondary leading-relaxed">
+                  В движок приложения встроен прямой защищённый резолвер Cloudflare 1.1.1.1 и Google DNS, который автоматически обходит DNS-подмену интернет-провайдеров.
+                </p>
+              </div>
+
+              <div className="rounded-sc border border-sc-border bg-[#141414] p-4 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-white mb-1.5">
+                    Встроенный прокси-туннель (SOCKS5 / HTTP)
+                  </label>
+                  <p className="text-[11px] text-sc-text-secondary mb-3">
+                    Укажи адрес любого локального или внешнего прокси. Трафик будет идти через прокси только для SoundCloud, не замедляя остальной интернет.
+                  </p>
+                  <input
+                    type="text"
+                    value={proxyInput}
+                    onChange={(e) => setProxyInput(e.target.value)}
+                    placeholder="socks5://127.0.0.1:10808 или http://127.0.0.1:7890"
+                    className="w-full rounded-sc border border-sc-border bg-[#1a1a1a] px-3.5 py-2 text-xs text-white placeholder:text-sc-text-secondary focus:border-sc-accent focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleApplyProxy(proxyInput)}
+                    className="flex-1 rounded-sc bg-sc-accent py-2 text-xs font-bold text-white hover:bg-sc-accent-hover transition-colors shadow-md"
+                  >
+                    Применить Прокси
+                  </button>
+                  {activeProxy && (
+                    <button
+                      onClick={() => {
+                        setProxyInput('');
+                        handleApplyProxy('');
+                      }}
+                      className="px-4 rounded-sc border border-sc-border bg-sc-surface py-2 text-xs font-bold text-red-400 hover:text-red-300 transition-colors"
+                    >
+                      Отключить
+                    </button>
+                  )}
+                </div>
+
+                {proxyStatus && (
+                  <div className="flex items-center gap-2 text-xs text-emerald-400 font-medium">
+                    <CheckCircle2 size={14} />
+                    <span>{proxyStatus}</span>
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-sc-border">
+                  <span className="text-[11px] font-semibold text-sc-text-secondary block mb-2">
+                    Популярные порты клиентов обхода (кликни для быстрой вставки):
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setProxyInput('socks5://127.0.0.1:10808')}
+                      className="text-[11px] px-2.5 py-1 rounded bg-[#202020] border border-sc-border text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors"
+                    >
+                      v2rayN / Xray (socks5://127.0.0.1:10808)
+                    </button>
+                    <button
+                      onClick={() => setProxyInput('socks5://127.0.0.1:1080')}
+                      className="text-[11px] px-2.5 py-1 rounded bg-[#202020] border border-sc-border text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors"
+                    >
+                      Zapret / ByeDPI (socks5://127.0.0.1:1080)
+                    </button>
+                    <button
+                      onClick={() => setProxyInput('http://127.0.0.1:7890')}
+                      className="text-[11px] px-2.5 py-1 rounded bg-[#202020] border border-sc-border text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors"
+                    >
+                      Clash / Flclash (http://127.0.0.1:7890)
+                    </button>
+                    <button
+                      onClick={() => setProxyInput('socks5://127.0.0.1:9050')}
+                      className="text-[11px] px-2.5 py-1 rounded bg-[#202020] border border-sc-border text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors"
+                    >
+                      Tor (socks5://127.0.0.1:9050)
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

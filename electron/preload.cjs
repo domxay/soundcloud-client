@@ -10,4 +10,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectSaveFile: (defaultName) => ipcRenderer.invoke('sc:select-save-file', defaultName),
   selectDownloadFolder: () => ipcRenderer.invoke('sc:select-download-folder'),
   selectBackgroundFile: () => ipcRenderer.invoke('sc:select-background-file'),
+  setProxy: (rule) => ipcRenderer.invoke('sc:set-proxy', rule),
 });

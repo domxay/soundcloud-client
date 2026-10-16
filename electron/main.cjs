@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, session, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
@@ -21,7 +21,15 @@ function getDownloadsPath() {
   return dir;
 }
 
-function fetchBuffer(url) {
+async function fetchBuffer(url) {
+  if (net && typeof net.fetch === 'function') {
+    const res = await net.fetch(url, { headers: DEFAULT_HEADERS });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+    const ab = await res.arrayBuffer();
+    return Buffer.from(ab);
+  }
   return new Promise((resolve, reject) => {
     const client = url.startsWith('https') ? https : http;
     const req = client.get(url, { headers: DEFAULT_HEADERS }, (res) => {
@@ -40,9 +48,13 @@ function fetchBuffer(url) {
   });
 }
 
-function fetchText(url) {
-  return fetchBuffer(url).then((b) => b.toString('utf-8'));
+async function fetchText(url) {
+  const buf = await fetchBuffer(url);
+  return buf.toString('utf-8');
 }
+
+app.commandLine.appendSwitch('enable-features', 'DnsOverHttps');
+app.commandLine.appendSwitch('dns-over-https-templates', 'https://1.1.1.1/dns-query{?dns} https://8.8.8.8/dns-query{?dns} https://cloudflare-dns.com/dns-query{?dns}');
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -140,6 +152,22 @@ ipcMain.handle('sc:select-background-file', async () => {
     url: `file:///${normalized}`,
     type: isVideo ? 'video' : 'image',
   };
+});
+
+ipcMain.handle('sc:set-proxy', async (event, proxyRule) => {
+  const rule = proxyRule && proxyRule.trim();
+  const config = rule ? { proxyRules: rule } : { mode: 'direct' };
+  try {
+    if (session.defaultSession) {
+      await session.defaultSession.setProxy(config);
+    }
+    if (mainWindow && mainWindow.webContents.session) {
+      await mainWindow.webContents.session.setProxy(config);
+    }
+    return { success: true, proxy: rule || null };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
 });
 
 ipcMain.handle('sc:open-login', () => {

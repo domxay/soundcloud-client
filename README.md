@@ -18,9 +18,22 @@ An authentic, ultra-high-performance desktop client for SoundCloud. Designed wit
 
 ---
 
+## Downloads & Releases
+
+Download the ready-to-run binaries from the [GitHub Releases page](https://github.com/domxay/soundcloud-client/releases/latest):
+- **Windows Setup Installer**: `SoundCloud.Desktop.Setup.1.0.0.exe` (Recommended: desktop shortcut, auto-updates)
+- **Windows Portable**: `SoundCloud.Desktop.1.0.0.exe` (Zero installation required, click and play)
+- **macOS & Linux**: Multi-platform automated builds via GitHub Actions workflow (`.dmg`, `.AppImage`, `.deb`)
+
+---
+
 ## Key Features
 
 - **Frameless Modern Window**: Clean, borderless desktop experience with custom window controls and smooth header dragging.
+- **In-App Censorship & Block Bypass (Without System-wide VPN)**:
+  - Built-in multi-resolver DNS-over-HTTPS (Cloudflare & Google DoH)
+  - Dedicated in-app SOCKS5 / HTTP proxy tunnel for routing SoundCloud traffic independently
+  - Instant presets for Zapret, ByeDPI, v2rayN, Xray, Clash, and Tor
 - **Authentic SoundCloud Home & Discover**:
   - Spotlight Hero featuring the top trending sound of the day
   - SoundCloud Charts: Top 50 Global hits
