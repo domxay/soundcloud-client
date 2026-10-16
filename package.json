@@ -14,6 +14,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "dist": "vite build && electron-builder --win",
+    "dist:installer": "vite build && electron-builder --win nsis",
     "dist:portable": "vite build && electron-builder --win portable",
     "dist:dir": "vite build && electron-builder --dir"
   },
