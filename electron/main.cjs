@@ -6,6 +6,31 @@ const http = require('http');
 const netSocket = require('net');
 
 let mainWindow = null;
+let currentProxyRule = null;
+
+function getProxySettingsPath() {
+  return path.join(app.getPath('userData'), 'proxy-settings.json');
+}
+
+function loadSavedProxy() {
+  try {
+    const file = getProxySettingsPath();
+    if (fs.existsSync(file)) {
+      const data = JSON.parse(fs.readFileSync(file, 'utf-8'));
+      if (data && typeof data.proxy === 'string') {
+        return data.proxy;
+      }
+    }
+  } catch {}
+  return null;
+}
+
+function saveProxySettings(proxy) {
+  try {
+    const file = getProxySettingsPath();
+    fs.writeFileSync(file, JSON.stringify({ proxy }), 'utf-8');
+  } catch {}
+}
 
 const DEFAULT_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -75,6 +100,9 @@ function createWindow() {
   });
 
   const distPath = path.join(__dirname, '../dist/index.html');
+  if (currentProxyRule && mainWindow.webContents.session) {
+    mainWindow.webContents.session.setProxy({ proxyRules: currentProxyRule }).catch(() => {});
+  }
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
   } else if (fs.existsSync(distPath)) {
@@ -157,6 +185,8 @@ ipcMain.handle('sc:select-background-file', async () => {
 
 ipcMain.handle('sc:set-proxy', async (event, proxyRule) => {
   const rule = proxyRule && proxyRule.trim();
+  currentProxyRule = rule || null;
+  saveProxySettings(currentProxyRule);
   const config = rule ? { proxyRules: rule } : { mode: 'direct' };
   try {
     if (session.defaultSession) {
@@ -186,7 +216,7 @@ function checkTcpPort(port, host = '127.0.0.1') {
   });
 }
 
-ipcMain.handle('sc:detect-local-proxy', async () => {
+async function detectLocalProxy() {
   const clashConfigPath = path.join(
     process.env.APPDATA || '',
     'io.github.clash-verge-rev.clash-verge-rev',
@@ -215,6 +245,7 @@ ipcMain.handle('sc:detect-local-proxy', async () => {
   }
 
   const commonPorts = [
+    { port: 39706, type: 'http', name: 'Clash Verge' },
     { port: 7890, type: 'http', name: 'Clash / Flclash' },
     { port: 7897, type: 'http', name: 'Clash Verge Rev' },
     { port: 10808, type: 'socks5', name: 'v2rayN / Xray' },
@@ -232,9 +263,24 @@ ipcMain.handle('sc:detect-local-proxy', async () => {
   }
 
   return { success: false };
-});
+}
 
-ipcMain.handle('sc:open-login', () => {
+ipcMain.handle('sc:detect-local-proxy', () => detectLocalProxy());
+
+ipcMain.handle('sc:open-login', async () => {
+  if (!currentProxyRule) {
+    const detected = await detectLocalProxy();
+    if (detected.success && detected.proxy) {
+      currentProxyRule = detected.proxy;
+      saveProxySettings(currentProxyRule);
+      if (session.defaultSession) {
+        try {
+          await session.defaultSession.setProxy({ proxyRules: currentProxyRule });
+        } catch {}
+      }
+    }
+  }
+
   return new Promise((resolve) => {
     const loginWin = new BrowserWindow({
       width: 520,
@@ -247,6 +293,10 @@ ipcMain.handle('sc:open-login', () => {
         contextIsolation: true,
       },
     });
+
+    if (currentProxyRule && loginWin.webContents.session) {
+      loginWin.webContents.session.setProxy({ proxyRules: currentProxyRule }).catch(() => {});
+    }
 
     let resolved = false;
     const filter = { urls: ['*://api-v2.soundcloud.com/*'] };
@@ -268,6 +318,35 @@ ipcMain.handle('sc:open-login', () => {
         resolve({ success: true, token, clientId });
       }
       callback({ requestHeaders: details.requestHeaders });
+    });
+
+    loginWin.webContents.on('did-fail-load', (event, errorCode) => {
+      if (resolved || errorCode === -3) return;
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body { background: #121212; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; padding: 24px; text-align: center; box-sizing: border-box; }
+h2 { font-size: 19px; font-weight: 700; margin-bottom: 8px; color: #ff5500; }
+p { font-size: 13px; color: #aaa; line-height: 1.6; max-width: 420px; margin: 8px 0; }
+.card { background: #1c1c1c; border: 1px solid #333; border-radius: 8px; padding: 14px 16px; font-size: 12px; color: #ccc; margin: 16px 0; text-align: left; max-width: 420px; }
+.card code { background: #2a2a2a; color: #ff8533; padding: 2px 6px; border-radius: 4px; }
+.btn { background: #ff5500; color: #fff; border: none; border-radius: 6px; padding: 10px 22px; font-weight: 700; font-size: 13px; cursor: pointer; margin-top: 10px; }
+.btn:hover { background: #ff4400; }
+</style>
+</head>
+<body>
+<h2>SoundCloud Недоступен (Offline)</h2>
+<p>В России доступ к SoundCloud блокируется ТСПУ/провайдерами, либо ваш VPN/прокси находится в прямом режиме.</p>
+<div class="card">
+<strong>Если у вас запущен Clash Verge:</strong><br>
+Переключите режим в Clash с <code>Direct</code> (Прямой) на <code>Rule</code> (По правилам) или <code>Global</code> (Глобальный), затем нажмите кнопку ниже.
+</div>
+<button class="btn" onclick="location.href='https://soundcloud.com/signin'">Повторить загрузку</button>
+</body>
+</html>`;
+      loginWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
     });
 
     loginWin.on('closed', () => {
@@ -342,7 +421,24 @@ ipcMain.handle('sc:open-downloads-folder', () => {
   return true;
 });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(async () => {
+  const saved = loadSavedProxy();
+  if (saved) {
+    currentProxyRule = saved;
+  } else {
+    const detected = await detectLocalProxy();
+    if (detected.success && detected.proxy) {
+      currentProxyRule = detected.proxy;
+      saveProxySettings(currentProxyRule);
+    }
+  }
+  if (currentProxyRule && session.defaultSession) {
+    try {
+      await session.defaultSession.setProxy({ proxyRules: currentProxyRule });
+    } catch {}
+  }
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

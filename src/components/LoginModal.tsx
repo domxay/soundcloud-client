@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Cloud, Key, Check, LogOut } from 'lucide-react';
+import { X, Cloud, Key, Check, LogOut, ShieldCheck } from 'lucide-react';
 import { authService } from '@/services/auth';
 import { soundcloudApi } from '@/services/api';
 
@@ -15,6 +15,18 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const [clientId, setClientId] = useState(session.clientId || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [detectedProxy, setDetectedProxy] = useState<{ success: boolean; proxy?: string; name?: string } | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (window.electronAPI?.detectLocalProxy) {
+      window.electronAPI.detectLocalProxy().then((res) => {
+        if (res && res.success) {
+          setDetectedProxy(res);
+        }
+      });
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -123,6 +135,18 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
           </div>
         )}
 
+        {detectedProxy && (
+          <div className="mb-4 rounded-sc bg-sc-bg border border-sc-border p-3 text-xs flex items-start gap-2.5">
+            <ShieldCheck size={16} className="text-sc-accent shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-white font-medium">Bypass proxy detected: {detectedProxy.name}</p>
+              <p className="text-[11px] text-sc-text-secondary mt-0.5 leading-snug">
+                In Russia: if the sign-in window says "offline", switch Clash Verge to <strong>Rule</strong> or <strong>Global</strong> (not Direct).
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4">
           <button
             onClick={handleWebviewLogin}
@@ -162,6 +186,13 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
               placeholder="SoundCloud client_id"
               className="w-full rounded-sc border border-sc-border bg-sc-bg py-2 px-3 text-sm text-white placeholder:text-sc-text-secondary focus:border-sc-accent focus:outline-none"
             />
+          </div>
+
+          <div className="rounded-sc bg-sc-bg/70 border border-sc-border/60 p-2.5 text-[11px] text-sc-text-secondary leading-relaxed">
+            <span className="font-semibold text-white">How to get token without VPN in browser:</span><br />
+            1. Open <span className="text-sc-accent font-medium">soundcloud.com</span> in browser<br />
+            2. Press <kbd className="px-1 py-0.5 rounded bg-sc-hover text-white text-[9px]">F12</kbd> &rarr; Network tab<br />
+            3. Find any <code className="text-white">api-v2</code> request &rarr; Headers &rarr; copy <code className="text-white">Authorization</code>
           </div>
 
           {error && <p className="text-xs text-red-400 mt-2">{error}</p>}

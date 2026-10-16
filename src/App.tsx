@@ -119,10 +119,19 @@ function App() {
 
     audioService.setVolume(volume);
 
-    const savedProxy = localStorage.getItem('sc_proxy_rule');
-    if (savedProxy && window.electronAPI?.setProxy) {
-      window.electronAPI.setProxy(savedProxy);
-    }
+    const initProxy = async () => {
+      const savedProxy = localStorage.getItem('sc_proxy_rule');
+      if (savedProxy && window.electronAPI?.setProxy) {
+        await window.electronAPI.setProxy(savedProxy);
+      } else if (window.electronAPI?.detectLocalProxy) {
+        const detected = await window.electronAPI.detectLocalProxy();
+        if (detected.success && detected.proxy) {
+          await window.electronAPI.setProxy(detected.proxy);
+          localStorage.setItem('sc_proxy_rule', detected.proxy);
+        }
+      }
+    };
+    initProxy();
 
     return () => {
       unsubAudio();
