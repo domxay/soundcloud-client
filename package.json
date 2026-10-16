@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "author": "domxay",
+  "description": "Authentic, high-performance SoundCloud Desktop Client by domxay",
   "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
@@ -11,7 +12,38 @@
     "electron": "electron .",
     "start": "vite build && electron .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "dist": "vite build && electron-builder --win",
+    "dist:portable": "vite build && electron-builder --win portable",
+    "dist:dir": "vite build && electron-builder --dir"
+  },
+  "build": {
+    "appId": "com.domxay.soundcloudclient",
+    "productName": "SoundCloud Desktop",
+    "copyright": "Copyright © 2026 domxay",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "resources/icon.png",
+      "resources/icon.ico"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "SoundCloud Desktop"
+    }
   },
   "dependencies": {
     "hls.js": "^1.7.3",
@@ -26,6 +58,7 @@
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.18",
     "electron": "^44.7.2",
+    "electron-builder": "^26.15.3",
     "eslint": "^9.9.1",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.11",
