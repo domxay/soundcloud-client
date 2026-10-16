@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sc-bg: #0e0507;
+  --sc-surface: #180a0e;
+  --sc-hover: #260f16;
+  --sc-border: #3d1622;
+  --sc-accent: #ff0055;
+  --sc-accent-hover: #ff2670;
+  --sc-text-primary: #ffffff;
+  --sc-text-secondary: #a87886;
+  --sc-wave-active: #ff0055;
+  --sc-wave-inactive: #3d1622;
+}
+
+html,
+body {
+  background-color: var(--sc-bg);
+  color: var(--sc-text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--sc-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--sc-border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--sc-hover);
+}
+
+.sc-glass {
+  background: rgba(18, 18, 18, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.sc-bg-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
