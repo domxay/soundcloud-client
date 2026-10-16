@@ -16,7 +16,10 @@
     "dist": "vite build && electron-builder --win",
     "dist:installer": "vite build && electron-builder --win nsis",
     "dist:portable": "vite build && electron-builder --win portable",
-    "dist:dir": "vite build && electron-builder --dir"
+    "dist:dir": "vite build && electron-builder --dir",
+    "dist:mac": "vite build && electron-builder --mac",
+    "dist:linux": "vite build && electron-builder --linux",
+    "dist:all": "vite build && electron-builder -mwl"
   },
   "build": {
     "appId": "com.domxay.soundcloudclient",
@@ -44,6 +47,22 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "SoundCloud Desktop"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.music",
+      "icon": "resources/icon.png"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Audio",
+      "icon": "resources/icon.png"
     }
   },
   "dependencies": {
