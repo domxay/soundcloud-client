@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Cloud, Key, Check, LogOut } from 'lucide-react';
 import { authService } from '@/services/auth';
 import { soundcloudApi } from '@/services/api';
@@ -16,9 +16,22 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleManualSave = async () => {
+    if (!token.trim()) {
+      setError('Please enter a valid OAuth token.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -30,7 +43,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       onLoginSuccess();
       onClose();
     } catch {
-      setError('Failed to connect. Verify your OAuth token.');
+      setError('Failed to connect. Verify your OAuth token or proxy connection.');
     } finally {
       setLoading(false);
     }
@@ -57,7 +70,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         setLoading(false);
       }
     } else {
-      setError('Browser login requires desktop Electron mode. You can paste your OAuth token below.');
+      setError('Browser login requires desktop mode. You can paste your OAuth token below.');
     }
   };
 
@@ -69,8 +82,14 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-md rounded-sc border border-sc-border bg-sc-surface p-6 shadow-2xl">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-md rounded-sc border border-sc-border bg-sc-surface p-6 shadow-2xl"
+      >
         <button
           onClick={onClose}
           className="absolute right-4 top-4 text-sc-text-secondary hover:text-white transition-colors"
@@ -79,10 +98,10 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         </button>
 
         <div className="flex items-center gap-3 mb-6">
-          <Cloud size={32} className="text-sc-accent" fill="#ff5500" />
+          <Cloud size={32} className="text-sc-accent" fill="currentColor" />
           <div>
             <h2 className="text-lg font-bold text-white">SoundCloud Account</h2>
-            <p className="text-xs text-sc-text-secondary">Client by domxay</p>
+            <p className="text-xs text-sc-text-secondary">Official sign-in</p>
           </div>
         </div>
 
@@ -108,7 +127,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
           <button
             onClick={handleWebviewLogin}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 rounded-sc bg-sc-accent py-2.5 px-4 text-sm font-bold text-white transition-colors hover:bg-sc-accent-hover disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 rounded-sc bg-sc-accent py-2.5 px-4 text-sm font-bold text-white transition-colors hover:bg-sc-accent-hover disabled:opacity-50 shadow-md"
           >
             <Cloud size={18} fill="white" />
             Sign in with SoundCloud

@@ -78,19 +78,25 @@ export default function ProfileView({
     }
   };
 
-  const username = user?.username || 'domxay';
-  const avatar = user?.avatar_url || 'https://images.pexels.com/photos/7446857/pexels-photo-7446857.jpeg?auto=compress&cs=tinysrgb&h=120&w=120';
+  const username = user?.username || 'SoundCloud User';
+  const avatar = user?.avatar_url;
   const location = user?.city ? `${user.city}${user.country_code ? `, ${user.country_code}` : ''}` : null;
 
   return (
     <div className="p-8 max-w-6xl mx-auto pb-32">
       <div className="relative rounded-sc overflow-hidden border border-sc-border bg-gradient-to-r from-[#2c1a0e] via-[#1f1a18] to-[#141414] p-8 shadow-2xl mb-8">
         <div className="flex flex-col md:flex-row items-center md:items-end gap-6">
-          <img
-            src={avatar}
-            alt={username}
-            className="h-32 w-32 rounded-full object-cover border-4 border-sc-surface shadow-2xl shrink-0"
-          />
+          {avatar ? (
+            <img
+              src={avatar}
+              alt={username}
+              className="h-32 w-32 rounded-full object-cover border-4 border-sc-surface shadow-2xl shrink-0"
+            />
+          ) : (
+            <div className="h-32 w-32 rounded-full bg-sc-surface border-4 border-sc-surface shadow-2xl shrink-0 flex items-center justify-center text-3xl font-black text-white">
+              {username.charAt(0).toUpperCase()}
+            </div>
+          )}
 
           <div className="flex-1 text-center md:text-left">
             <span className="text-[11px] font-bold uppercase tracking-widest text-sc-accent">SOUNDCLOUD PROFILE</span>

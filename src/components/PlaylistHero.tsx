@@ -26,11 +26,17 @@ export default function PlaylistHero({
   return (
     <div className="flex flex-col md:flex-row gap-8 p-8">
       <div className="relative shrink-0 mx-auto md:mx-0">
-        <img
-          src={playlist.artwork}
-          alt={playlist.title}
-          className="h-52 w-52 rounded-sc object-cover shadow-2xl shadow-black/70 border border-sc-border"
-        />
+        {playlist.artwork ? (
+          <img
+            src={playlist.artwork}
+            alt={playlist.title}
+            className="h-52 w-52 rounded-sc object-cover shadow-2xl shadow-black/70 border border-sc-border"
+          />
+        ) : (
+          <div className="h-52 w-52 rounded-sc bg-sc-surface border border-sc-border flex items-center justify-center text-sc-text-secondary shadow-2xl shadow-black/70">
+            <Music2 size={64} className="opacity-40" />
+          </div>
+        )}
         <div className="absolute inset-0 flex items-center justify-center rounded-sc bg-black/40 opacity-0 transition-opacity hover:opacity-100">
           <Music2 size={48} className="text-white/80" />
         </div>

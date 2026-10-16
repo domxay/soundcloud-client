@@ -2,7 +2,6 @@ import { AuthSession, UserProfile } from '@/types';
 
 const STORAGE_KEY = 'sc_auth_session';
 const DEFAULT_CLIENT_ID = 'QhVEWrrJKvW4uSU5u5EoI0FTXYUGzy5k';
-const INITIAL_TOKEN = 'eyJraWQiOiJzYy16Z0xnWUJnIiwidHlwIjoiYXQrSldUIiwiYWxnIjoiUlMyNTYifQ.eyJzdWIiOiJzb3VuZGNsb3VkOnVzZXJzOjE3NjQ2NTkxMDMiLCJhdWQiOiJodHRwczovL3NvdW5kY2xvdWQuY29tIiwic2NvcGUiOiIqIGZhc3QtY29ubmVjdCBwbGF5Y291bnQgcHVyY2hhc2Ugc2lnbnVwIHVwbG9hZCIsImlzcyI6Imh0dHBzOi8vc2VjdXJlLnNvdW5kY2xvdWQuY29tIiwiY2FpIjoiNDY5NDEiLCJleHAiOjE3OTIxNTMyNDYsImlhdCI6MTc5MjA2Njg0NiwianRpIjoiODM2YzVkNjktNTBlZS00NjY1LTlmOTctYzE4NDBmYzEzYmFiIiwiY2xpZW50X2lkIjoiUWhWRVdyckpLdlc0dVNVNXU1RW9JMEZUWFlVR3p5NWsiLCJzaWQiOiIwMU00WlIzWVRBM1cwVzlXMVhFMlZDNlI2WCJ9.GQKDCs8OI6pFL1cD9Tzaj24Tf-sTKE4M5cAyPC9tePRYEKrHhRIo8D1mdK7Nz17nJCUnACOyZ0lgdt4JZgR-HCXpwoUu8RUU43iRdLu9kh4EE4ylQqBf3U74QjQiU6phJT0ceWBD959hhdWw3JUC5qWvu45eN53c6JYVNBXvZ0ZDxbMvfagIeLdwqUDEoI8BLYZlyCh5OvfTtl7EjxCqgBpB-i3D4qjtrNCtr-6TWb3cgpGT9ibhSJIipR029eZUhmiyvRu2BLLsNs3vWgvzAmMtIXgfKz1_sC5_fsfZz47pgztmcSxEhVuHM5A-QsdIaXVqpuwu8AnLZStiQZSFVw';
 
 export class AuthService {
   private static instance: AuthService;
@@ -26,18 +25,13 @@ export class AuthService {
         this.session = JSON.parse(stored);
       } else {
         this.session = {
-          oauthToken: INITIAL_TOKEN,
+          oauthToken: '',
           clientId: DEFAULT_CLIENT_ID,
-          user: {
-            id: 1764659103,
-            username: 'domxay',
-            avatar_url: 'https://images.pexels.com/photos/7446857/pexels-photo-7446857.jpeg?auto=compress&cs=tinysrgb&h=80&w=80',
-          },
         };
       }
     } catch {
       this.session = {
-        oauthToken: INITIAL_TOKEN,
+        oauthToken: '',
         clientId: DEFAULT_CLIENT_ID,
       };
     }
@@ -85,7 +79,7 @@ export class AuthService {
   }
 
   public isAuthenticated(): boolean {
-    return Boolean(this.session?.oauthToken);
+    return Boolean(this.session?.oauthToken && this.session.oauthToken.trim().length > 0);
   }
 }
 

@@ -502,9 +502,9 @@ export class SoundCloudApi {
       timestamp: Math.round(timestampMs),
       created_at: new Date().toISOString(),
       user: {
-        id: user?.id || 1764659103,
-        username: user?.username || 'domxay',
-        avatar_url: user?.avatar_url || 'https://images.pexels.com/photos/7446857/pexels-photo-7446857.jpeg?auto=compress&cs=tinysrgb&h=80&w=80',
+        id: user?.id || Date.now(),
+        username: user?.username || 'You',
+        avatar_url: user?.avatar_url || '',
       },
     };
 

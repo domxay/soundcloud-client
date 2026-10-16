@@ -1,5 +1,5 @@
-import { Search, Cloud, User, Minus, Square, X, Send, Palette } from 'lucide-react';
-import { useState } from 'react';
+import { Search, Cloud, User, Minus, Square, X, Send, Palette, LogOut } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { authService } from '@/services/auth';
 
 const navTabs = ['Home', 'Stream', 'Library', 'Playlists', 'Likes', 'Downloads', 'Profile'];
@@ -21,9 +21,21 @@ export default function Header({
 }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
+  const isAuth = authService.isAuthenticated();
   const session = authService.getSession();
-  const username = session.user?.username || 'domxay';
-  const avatar = session.user?.avatar_url || 'https://images.pexels.com/photos/7446857/pexels-photo-7446857.jpeg?auto=compress&cs=tinysrgb&h=80&w=80';
+
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setDropdownOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [dropdownOpen]);
+  const username = session.user?.username || 'User';
+  const avatar = session.user?.avatar_url;
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -61,15 +73,12 @@ export default function Header({
       style={{ WebkitAppRegion: 'drag' } as any}
     >
       <div
-        className="flex items-center gap-2 cursor-pointer shrink-0"
+        className="flex items-center gap-2.5 cursor-pointer shrink-0"
         style={{ WebkitAppRegion: 'no-drag' } as any}
         onClick={() => onTabChange('Home')}
       >
-        <Cloud size={26} className="text-sc-accent" fill="currentColor" />
+        <Cloud size={28} className="text-sc-accent" fill="currentColor" />
         <span className="text-base font-bold tracking-tight text-white">SoundCloud</span>
-        <span className="rounded-sc bg-sc-surface px-1.5 py-0.5 text-[10px] font-medium text-sc-text-secondary border border-sc-border">
-          by domxay
-        </span>
       </div>
 
       <div
@@ -116,7 +125,7 @@ export default function Header({
         <button
           onClick={onOpenThemeSettings}
           className="flex items-center gap-1 rounded-sc border border-sc-border bg-sc-surface px-2.5 py-1 text-xs font-semibold text-white hover:border-sc-accent hover:text-sc-accent transition-all shadow-sm"
-          title="Themes & Custom Background"
+          title="Themes & Network Studio"
         >
           <Palette size={13} className="text-sc-accent" />
           <span>Themes</span>
@@ -125,60 +134,82 @@ export default function Header({
         <button
           onClick={handleOpenTelegram}
           className="flex items-center gap-1.5 rounded-sc border border-[#229ED9]/40 bg-[#229ED9]/10 px-2.5 py-1 text-xs font-semibold text-[#229ED9] hover:bg-[#229ED9] hover:text-white transition-all shadow-sm"
-          title="Канал автора в Telegram"
+          title="Author Telegram Channel"
         >
           <Send size={12} className="rotate-[-20deg]" />
           <span>@codesand</span>
         </button>
 
-        <div className="relative">
-          <button
-            onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex items-center gap-2 rounded-sc border border-sc-border bg-sc-surface py-1 pl-1 pr-2.5 transition-colors hover:bg-sc-hover"
-          >
-            <img
-              src={avatar}
-              alt="avatar"
-              className="h-7 w-7 rounded-full object-cover border border-sc-border"
-            />
-            <span className="text-xs font-medium max-w-[90px] truncate">{username}</span>
-          </button>
+        {isAuth ? (
+          <div className="relative">
+            <button
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className="flex items-center gap-2 rounded-sc border border-sc-border bg-sc-surface py-1 pl-1 pr-2.5 transition-colors hover:bg-sc-hover"
+            >
+              {avatar ? (
+                <img
+                  src={avatar}
+                  alt={username}
+                  className="h-7 w-7 rounded-full object-cover border border-sc-border"
+                />
+              ) : (
+                <div className="h-7 w-7 rounded-full bg-sc-hover border border-sc-border flex items-center justify-center text-white text-xs font-bold">
+                  {username.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className="text-xs font-medium max-w-[90px] truncate">{username}</span>
+            </button>
 
-          {dropdownOpen && (
-            <div className="absolute right-0 top-11 w-44 rounded-sc border border-sc-border bg-sc-surface py-1 shadow-2xl z-50">
-              <button
-                onClick={() => {
-                  setDropdownOpen(false);
-                  onTabChange('Profile');
-                }}
-                className="w-full px-3.5 py-2 text-left text-xs text-sc-text-secondary hover:bg-sc-hover hover:text-white flex items-center gap-2"
-              >
-                <User size={14} />
-                View Profile
-              </button>
-              <button
-                onClick={() => {
-                  setDropdownOpen(false);
-                  onOpenThemeSettings();
-                }}
-                className="w-full px-3.5 py-2 text-left text-xs text-sc-text-secondary hover:bg-sc-hover hover:text-white flex items-center gap-2"
-              >
-                <Palette size={14} />
-                Themes & Background
-              </button>
-              <div className="my-1 border-t border-sc-border" />
-              <button
-                onClick={() => {
-                  setDropdownOpen(false);
-                  onOpenLogin();
-                }}
-                className="w-full px-3.5 py-2 text-left text-xs text-sc-accent hover:bg-sc-hover font-medium"
-              >
-                {authService.isAuthenticated() ? 'Switch / Logout' : 'Connect Account'}
-              </button>
-            </div>
-          )}
-        </div>
+            {dropdownOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setDropdownOpen(false)}
+                />
+                <div className="absolute right-0 top-11 w-44 rounded-sc border border-sc-border bg-sc-surface py-1 shadow-2xl z-50">
+                  <button
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      onTabChange('Profile');
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-xs text-sc-text-secondary hover:bg-sc-hover hover:text-white flex items-center gap-2"
+                  >
+                    <User size={14} />
+                    View Profile
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      onOpenThemeSettings();
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-xs text-sc-text-secondary hover:bg-sc-hover hover:text-white flex items-center gap-2"
+                  >
+                    <Palette size={14} />
+                    Themes & Network
+                  </button>
+                  <div className="my-1 border-t border-sc-border" />
+                  <button
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      onOpenLogin();
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-xs text-red-400 hover:bg-sc-hover font-medium flex items-center gap-2"
+                  >
+                    <LogOut size={14} />
+                    Account / Logout
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={onOpenLogin}
+            className="rounded-sc bg-sc-accent px-4 py-1.5 text-xs font-bold text-white hover:bg-sc-accent-hover transition-colors shadow-sm"
+          >
+            Sign In
+          </button>
+        )}
       </div>
 
       {isElectron && (

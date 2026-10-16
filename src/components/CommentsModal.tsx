@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Track, Comment } from '@/types';
 import { soundcloudApi } from '@/services/api';
 import { formatTime } from '@/services/utils';
-import { X, MessageSquare, Send, Clock, Loader2, Sparkles, Check } from 'lucide-react';
+import { X, MessageSquare, Send, Clock, Loader2, Check } from 'lucide-react';
 
 interface CommentsModalProps {
   track: Track | null;
@@ -24,6 +24,15 @@ export default function CommentsModal({
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [justPosted, setJustPosted] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     let isMounted = true;
@@ -65,11 +74,15 @@ export default function CommentsModal({
     onSeek(seconds);
   };
 
-  const quickReplies = ['Fire track! 🔥', 'Bass hits hard 🔊', 'Masterpiece ✨', 'On repeat all day'];
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-xl h-[660px] flex flex-col rounded-sc border border-sc-border bg-[#161616] shadow-2xl overflow-hidden">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-xl h-[660px] flex flex-col rounded-sc border border-sc-border bg-[#161616] shadow-2xl overflow-hidden"
+      >
         <div className="flex items-center justify-between border-b border-sc-border px-5 py-4 bg-[#1a1a1a]">
           <div className="flex items-center gap-3 overflow-hidden">
             <img
@@ -92,20 +105,20 @@ export default function CommentsModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 border-b border-sc-border bg-[#141414]">
-          <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center justify-between gap-2 mb-2.5">
             <div className="flex items-center gap-2">
               <span className="flex items-center gap-1 rounded bg-[#222] border border-sc-border px-2 py-0.5 text-[11px] font-semibold text-sc-accent">
                 <Clock size={12} />
                 at {formatTime(currentTime)}
               </span>
               <span className="text-xs text-sc-text-secondary">
-                Comment attached to this exact moment
+                Attach comment to playback position
               </span>
             </div>
 
             {justPosted && (
               <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
-                <Check size={14} /> Posted!
+                <Check size={14} /> Posted
               </span>
             )}
           </div>
@@ -115,31 +128,17 @@ export default function CommentsModal({
               type="text"
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Write a comment on this sound..."
-              className="flex-1 rounded-sc border border-sc-border bg-[#1c1c1c] px-3 py-2 text-xs text-white placeholder:text-sc-text-secondary focus:border-sc-accent focus:outline-none"
+              placeholder="Write a comment..."
+              className="flex-1 rounded-sc border border-sc-border bg-[#1c1c1c] px-3.5 py-2 text-xs text-white placeholder:text-sc-text-secondary focus:border-sc-accent focus:outline-none"
             />
             <button
               type="submit"
               disabled={submitting || !newComment.trim()}
-              className="flex items-center gap-1.5 rounded-sc bg-sc-accent px-4 py-2 text-xs font-bold text-white hover:bg-sc-accent-hover transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-sc bg-sc-accent px-4 py-2 text-xs font-bold text-white hover:bg-sc-accent-hover transition-colors disabled:opacity-50 shadow-sm"
             >
               {submitting ? <Loader2 size={14} className="animate-spin-slow" /> : <Send size={14} />}
-              Send
+              Comment
             </button>
-          </div>
-
-          <div className="flex items-center gap-1.5 mt-2.5 overflow-x-auto no-scrollbar">
-            <span className="text-[10px] text-sc-text-secondary uppercase font-semibold shrink-0">Quick:</span>
-            {quickReplies.map((text, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setNewComment(text)}
-                className="text-[11px] px-2 py-0.5 rounded-full bg-[#202020] border border-sc-border text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors shrink-0"
-              >
-                {text}
-              </button>
-            ))}
           </div>
         </form>
 
@@ -147,13 +146,13 @@ export default function CommentsModal({
           {loading ? (
             <div className="text-center py-20 text-xs text-sc-text-secondary flex flex-col items-center">
               <Loader2 size={24} className="animate-spin-slow text-sc-accent mb-2" />
-              Loading track comments...
+              Loading comments...
             </div>
           ) : comments.length === 0 ? (
             <div className="text-center py-24 text-sc-text-secondary flex flex-col items-center">
               <MessageSquare size={36} className="text-sc-border mb-2" />
               <p className="text-sm font-medium text-white">No comments yet</p>
-              <p className="text-xs text-sc-text-secondary mt-1">Be the first to share your thoughts at any point in the track!</p>
+              <p className="text-xs text-sc-text-secondary mt-1">Be the first to share your thoughts on this track.</p>
             </div>
           ) : (
             comments.map((comment) => (
@@ -169,16 +168,13 @@ export default function CommentsModal({
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-xs font-semibold text-white truncate flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-white truncate">
                       {comment.user.username}
-                      {comment.user.username === 'domxay' && (
-                        <span className="bg-sc-accent text-white text-[9px] px-1 rounded font-bold uppercase">Author</span>
-                      )}
                     </span>
                     <button
                       onClick={() => handleSeekToComment(comment.timestamp)}
                       className="text-[10px] tabular-nums font-semibold text-sc-accent bg-sc-surface border border-sc-border px-1.5 py-0.5 rounded hover:bg-sc-hover transition-colors"
-                      title="Seek to comment timestamp"
+                      title="Seek to comment"
                     >
                       {formatTime(comment.timestamp / 1000)}
                     </button>

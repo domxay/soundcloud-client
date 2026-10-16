@@ -25,5 +25,6 @@ interface Window {
     selectDownloadFolder: () => Promise<string | null>;
     selectBackgroundFile: () => Promise<{ url: string; type: 'video' | 'image' } | null>;
     setProxy: (rule: string | null) => Promise<{ success: boolean; proxy?: string | null }>;
+    detectLocalProxy?: () => Promise<{ success: boolean; proxy?: string; name?: string }>;
   };
 }

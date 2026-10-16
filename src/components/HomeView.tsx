@@ -110,10 +110,9 @@ export default function HomeView({
               </div>
 
               <div className="max-w-xl">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-sc-accent/20 border border-sc-accent/40 text-sc-accent text-[11px] font-extrabold uppercase tracking-wider mb-2">
-                  <Flame size={13} />
-                  Top 1 SoundCloud Spotlight
-                </div>
+                <span className="text-xs font-bold text-sc-accent uppercase tracking-wider block mb-1.5">
+                  Featured Track
+                </span>
                 <h1 className="text-2xl md:text-4xl font-black text-white leading-tight truncate">
                   {heroTrack.title}
                 </h1>
@@ -134,7 +133,7 @@ export default function HomeView({
                     ) : (
                       <>
                         <Play size={16} fill="white" />
-                        Play Spotlight
+                        Play
                       </>
                     )}
                   </button>
@@ -159,21 +158,15 @@ export default function HomeView({
                 </div>
               </div>
             </div>
-
-            <div className="hidden lg:flex flex-col items-end text-right">
-              <span className="text-xs text-sc-text-secondary font-medium">Authentic Client</span>
-              <span className="text-sm font-extrabold text-white">SoundCloud Desktop</span>
-              <span className="text-xs text-sc-accent font-semibold mt-0.5">by domxay</span>
-            </div>
           </div>
         </div>
       )}
 
       <section>
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Trophy className="text-sc-accent" size={20} />
-            <h2 className="text-lg font-bold text-white">SoundCloud Charts: Top 50 Global</h2>
+          <div>
+            <h2 className="text-xl font-bold text-white">Charts: Top 50</h2>
+            <p className="text-xs text-sc-text-secondary mt-0.5">The most played tracks on SoundCloud this week</p>
           </div>
           <button
             onClick={() => onNavigateTab('Stream')}
@@ -246,9 +239,9 @@ export default function HomeView({
 
       <section>
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <ListMusic className="text-sc-accent" size={20} />
-            <h2 className="text-lg font-bold text-white">Curated Mixes & Playlists</h2>
+          <div>
+            <h2 className="text-xl font-bold text-white">Curated Playlists</h2>
+            <p className="text-xs text-sc-text-secondary mt-0.5">Hand-picked mixes and albums</p>
           </div>
           <button
             onClick={() => onNavigateTab('Library')}
@@ -291,9 +284,9 @@ export default function HomeView({
 
       <section>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-          <div className="flex items-center gap-2">
-            <Sparkles className="text-sc-accent" size={20} />
-            <h2 className="text-lg font-bold text-white">Explore Trending by Genre</h2>
+          <div>
+            <h2 className="text-xl font-bold text-white">Explore by Genre</h2>
+            <p className="text-xs text-sc-text-secondary mt-0.5">Trending tracks across the community</p>
           </div>
 
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">

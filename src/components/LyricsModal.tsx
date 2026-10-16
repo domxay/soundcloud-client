@@ -24,6 +24,15 @@ export default function LyricsModal({
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
     let isMounted = true;
     if (isOpen && track) {
       setLoading(true);
@@ -62,8 +71,14 @@ export default function LyricsModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-      <div className="relative w-full max-w-2xl h-[700px] flex flex-col rounded-sc border border-sc-border bg-[#141414]/95 shadow-2xl overflow-hidden">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-2xl h-[700px] flex flex-col rounded-sc border border-sc-border bg-[#141414]/95 shadow-2xl overflow-hidden"
+      >
         <div className="flex items-center justify-between border-b border-sc-border px-6 py-4 bg-[#181818]/90">
           <div className="flex items-center gap-3 overflow-hidden">
             <img

@@ -151,7 +151,7 @@ function App() {
 
   const loadUserData = useCallback(async () => {
     if (!authService.isAuthenticated()) {
-      setIsLoginModalOpen(true);
+      setLoading(false);
       return;
     }
 
@@ -171,7 +171,7 @@ function App() {
         setCurrentPlaylist({
           id: 1,
           title: 'Recently Played Stream',
-          artist: user?.username || 'domxay',
+          artist: user?.username || 'Me',
           artwork: history[0]?.artwork || emptyPlaylist.artwork,
           updatedDaysAgo: 0,
           tracks: history,
@@ -185,7 +185,7 @@ function App() {
           setCurrentPlaylist({
             id: 2,
             title: 'Liked Tracks',
-            artist: user?.username || 'domxay',
+            artist: user?.username || 'Me',
             artwork: likes[0]?.artwork || emptyPlaylist.artwork,
             updatedDaysAgo: 0,
             tracks: likes,
@@ -238,7 +238,7 @@ function App() {
           setCurrentPlaylist({
             id: 999,
             title: 'My Liked Tracks',
-            artist: authService.getSession().user?.username || 'domxay',
+            artist: authService.getSession().user?.username || 'Me',
             artwork: likes[0]?.artwork || emptyPlaylist.artwork,
             updatedDaysAgo: 0,
             tracks: likes,
@@ -249,7 +249,7 @@ function App() {
           setCurrentPlaylist({
             id: 999,
             title: 'Liked Tracks (Empty - Discover Below)',
-            artist: authService.getSession().user?.username || 'domxay',
+            artist: authService.getSession().user?.username || 'Me',
             artwork: trending[0]?.artwork || emptyPlaylist.artwork,
             updatedDaysAgo: 0,
             tracks: trending,
@@ -268,7 +268,7 @@ function App() {
           setCurrentPlaylist({
             id: 1,
             title: 'Recently Played Stream',
-            artist: authService.getSession().user?.username || 'domxay',
+            artist: authService.getSession().user?.username || 'Me',
             artwork: history[0]?.artwork || emptyPlaylist.artwork,
             updatedDaysAgo: 0,
             tracks: history,
@@ -414,8 +414,45 @@ function App() {
         onSearch={handleSearch}
       />
 
-      <main className="mx-auto max-w-[1400px] w-full flex-1 relative z-10">
-        {activeTab === 'Home' ? (
+      <main className="mx-auto max-w-[1400px] w-full flex-1 relative z-10 flex flex-col">
+        {!authService.isAuthenticated() ? (
+          <div className="flex-1 flex flex-col items-center justify-center py-24 px-4 text-center">
+            <div className="w-full max-w-md rounded-sc border border-sc-border bg-sc-surface p-8 shadow-2xl">
+              <div className="flex justify-center mb-5">
+                <div className="h-16 w-16 rounded-full bg-sc-accent/15 border border-sc-accent/30 flex items-center justify-center text-sc-accent">
+                  <Cloud size={36} fill="currentColor" />
+                </div>
+              </div>
+
+              <h1 className="text-2xl font-black text-white tracking-tight">
+                Welcome to SoundCloud
+              </h1>
+              <p className="text-xs text-sc-text-secondary mt-2 mb-8 leading-relaxed">
+                Sign in with your personal SoundCloud account to unlock your personalized stream, playlists, liked tracks, synchronized karaoke lyrics, and audio downloader.
+              </p>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => setIsLoginModalOpen(true)}
+                  className="w-full flex items-center justify-center gap-2.5 rounded-sc bg-sc-accent py-3 px-5 text-xs font-bold text-white hover:bg-sc-accent-hover transition-colors shadow-lg shadow-sc-accent/25"
+                >
+                  <Cloud size={16} fill="white" />
+                  Sign In with SoundCloud
+                </button>
+              </div>
+
+              <div className="mt-8 pt-5 border-t border-sc-border flex items-center justify-between text-[11px] text-sc-text-secondary">
+                <span>In Russia without VPN?</span>
+                <button
+                  onClick={() => setIsThemeModalOpen(true)}
+                  className="text-sc-accent font-semibold hover:underline"
+                >
+                  Open Bypass / Network
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : activeTab === 'Home' ? (
           <HomeView
             currentTrackId={currentTrack?.id ?? null}
             isPlaying={isPlaying}
@@ -451,21 +488,6 @@ function App() {
           />
         ) : activeTab === 'Downloads' ? (
           <DownloadsView downloads={downloads} />
-        ) : !authService.isAuthenticated() && tracks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-28 px-4 text-center">
-            <Cloud size={64} className="text-sc-accent mb-4" fill="currentColor" />
-            <h2 className="text-3xl font-extrabold text-white">Sign In to SoundCloud</h2>
-            <p className="text-sm text-sc-text-secondary max-w-md mt-2 mb-6">
-              Connect your SoundCloud personal account to play your streams, listen to your playlists, and download any track directly to your PC.
-            </p>
-            <button
-              onClick={() => setIsLoginModalOpen(true)}
-              className="flex items-center gap-2 rounded-sc bg-sc-accent px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-sc-accent-hover shadow-lg shadow-sc-accent/25"
-            >
-              <LogIn size={18} />
-              Connect Account
-            </button>
-          </div>
         ) : (
           <>
             <PlaylistHero
@@ -497,31 +519,33 @@ function App() {
         )}
       </main>
 
-      <PlayerBar
-        track={currentTrack}
-        isPlaying={isPlaying}
-        progress={progress}
-        currentTime={currentTime}
-        duration={duration}
-        volume={volume}
-        shuffle={shuffle}
-        repeat={repeat}
-        liked={currentTrack?.liked ?? false}
-        downloading={isPlayerDownloading}
-        comments={currentTrackComments}
-        onPlayPause={() => audioService.togglePlay()}
-        onPrev={handlePrev}
-        onNext={handleNext}
-        onSeek={handleSeek}
-        onVolume={handleVolumeChange}
-        onShuffle={() => setShuffle(!shuffle)}
-        onRepeat={() => setRepeat(!repeat)}
-        onLike={() => currentTrack && handleLikeToggle(currentTrack.id)}
-        onDownload={() => currentTrack && handleDownload(currentTrack.id)}
-        onOpenDownloads={() => setActiveTab('Downloads')}
-        onOpenComments={() => handleOpenCommentsModal()}
-        onOpenLyrics={() => setIsLyricsOpen(true)}
-      />
+      {authService.isAuthenticated() && currentTrack && (
+        <PlayerBar
+          track={currentTrack}
+          isPlaying={isPlaying}
+          progress={progress}
+          currentTime={currentTime}
+          duration={duration}
+          volume={volume}
+          shuffle={shuffle}
+          repeat={repeat}
+          liked={currentTrack?.liked ?? false}
+          downloading={isPlayerDownloading}
+          comments={currentTrackComments}
+          onPlayPause={() => audioService.togglePlay()}
+          onPrev={handlePrev}
+          onNext={handleNext}
+          onSeek={handleSeek}
+          onVolume={handleVolumeChange}
+          onShuffle={() => setShuffle(!shuffle)}
+          onRepeat={() => setRepeat(!repeat)}
+          onLike={() => currentTrack && handleLikeToggle(currentTrack.id)}
+          onDownload={() => currentTrack && handleDownload(currentTrack.id)}
+          onOpenDownloads={() => setActiveTab('Downloads')}
+          onOpenComments={() => handleOpenCommentsModal()}
+          onOpenLyrics={() => setIsLyricsOpen(true)}
+        />
+      )}
 
       <LoginModal
         isOpen={isLoginModalOpen}

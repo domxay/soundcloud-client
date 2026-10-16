@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const https = require('https');
 const http = require('http');
+const netSocket = require('net');
 
 let mainWindow = null;
 
@@ -54,7 +55,7 @@ async function fetchText(url) {
 }
 
 app.commandLine.appendSwitch('enable-features', 'DnsOverHttps');
-app.commandLine.appendSwitch('dns-over-https-templates', 'https://1.1.1.1/dns-query{?dns} https://8.8.8.8/dns-query{?dns} https://cloudflare-dns.com/dns-query{?dns}');
+app.commandLine.appendSwitch('dns-over-https-templates', 'https://freedns.controld.com/p0 https://dns.adguard-dns.com/dns-query https://1.1.1.1/dns-query{?dns} https://8.8.8.8/dns-query{?dns}');
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -170,6 +171,69 @@ ipcMain.handle('sc:set-proxy', async (event, proxyRule) => {
   }
 });
 
+function checkTcpPort(port, host = '127.0.0.1') {
+  return new Promise((resolve) => {
+    const socket = netSocket.connect({ host, port, timeout: 350 });
+    socket.on('connect', () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.on('error', () => resolve(false));
+    socket.on('timeout', () => {
+      socket.destroy();
+      resolve(false);
+    });
+  });
+}
+
+ipcMain.handle('sc:detect-local-proxy', async () => {
+  const clashConfigPath = path.join(
+    process.env.APPDATA || '',
+    'io.github.clash-verge-rev.clash-verge-rev',
+    'clash-verge.yaml'
+  );
+  if (fs.existsSync(clashConfigPath)) {
+    try {
+      const content = fs.readFileSync(clashConfigPath, 'utf-8');
+      const mixedMatch = content.match(/mixed-port:\s*(\d+)/);
+      if (mixedMatch) {
+        const port = parseInt(mixedMatch[1], 10);
+        const isOpen = await checkTcpPort(port);
+        if (isOpen) {
+          return { success: true, proxy: `http://127.0.0.1:${port}`, name: `Clash Verge (Port ${port})` };
+        }
+      }
+      const socksMatch = content.match(/socks-port:\s*(\d+)/);
+      if (socksMatch) {
+        const port = parseInt(socksMatch[1], 10);
+        const isOpen = await checkTcpPort(port);
+        if (isOpen) {
+          return { success: true, proxy: `socks5://127.0.0.1:${port}`, name: `Clash Verge SOCKS5 (Port ${port})` };
+        }
+      }
+    } catch {}
+  }
+
+  const commonPorts = [
+    { port: 7890, type: 'http', name: 'Clash / Flclash' },
+    { port: 7897, type: 'http', name: 'Clash Verge Rev' },
+    { port: 10808, type: 'socks5', name: 'v2rayN / Xray' },
+    { port: 1080, type: 'socks5', name: 'Zapret / ByeDPI' },
+    { port: 2080, type: 'socks5', name: 'Sing-box' },
+    { port: 9050, type: 'socks5', name: 'Tor Browser' },
+  ];
+
+  for (const item of commonPorts) {
+    const isOpen = await checkTcpPort(item.port);
+    if (isOpen) {
+      const proto = item.type === 'socks5' ? 'socks5' : 'http';
+      return { success: true, proxy: `${proto}://127.0.0.1:${item.port}`, name: `${item.name} (${item.port})` };
+    }
+  }
+
+  return { success: false };
+});
+
 ipcMain.handle('sc:open-login', () => {
   return new Promise((resolve) => {
     const loginWin = new BrowserWindow({
@@ -177,7 +241,7 @@ ipcMain.handle('sc:open-login', () => {
       height: 720,
       parent: mainWindow,
       modal: true,
-      title: 'SoundCloud Login - by domxay',
+      title: 'Sign in to SoundCloud',
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,

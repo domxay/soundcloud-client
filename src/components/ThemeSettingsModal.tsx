@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { themeService, THEME_PRESETS, BACKGROUND_PRESETS, CustomBackground } from '@/services/theme';
-import { X, Palette, Image as ImageIcon, Video, Check, Upload, Sliders, Sparkles, Shield, Globe, CheckCircle2 } from 'lucide-react';
+import { X, Palette, Image as ImageIcon, Video, Check, Upload, Sliders, Sparkles, Shield, Globe, CheckCircle2, RefreshCw } from 'lucide-react';
 
 interface ThemeSettingsModalProps {
   isOpen: boolean;
@@ -15,6 +15,17 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
   const [proxyInput, setProxyInput] = useState('');
   const [activeProxy, setActiveProxy] = useState('');
   const [proxyStatus, setProxyStatus] = useState<string | null>(null);
+  const [detectedProxy, setDetectedProxy] = useState<{ proxy: string; name: string } | null>(null);
+  const [detecting, setDetecting] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     const saved = localStorage.getItem('sc_proxy_rule');
@@ -23,6 +34,30 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
       setActiveProxy(saved);
     }
   }, []);
+
+  const handleDetectProxy = async () => {
+    if (window.electronAPI?.detectLocalProxy) {
+      setDetecting(true);
+      try {
+        const res = await window.electronAPI.detectLocalProxy();
+        if (res && res.success && res.proxy) {
+          setDetectedProxy({ proxy: res.proxy, name: res.name || 'Local Proxy' });
+        } else {
+          setDetectedProxy(null);
+        }
+      } catch {
+        setDetectedProxy(null);
+      } finally {
+        setDetecting(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      handleDetectProxy();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -108,8 +143,14 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-2xl h-[700px] flex flex-col rounded-sc border border-sc-border bg-sc-surface shadow-2xl overflow-hidden">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-2xl h-[700px] flex flex-col rounded-sc border border-sc-border bg-sc-surface shadow-2xl overflow-hidden"
+      >
         <div className="flex items-center justify-between border-b border-sc-border px-6 py-4 bg-[#141414]">
           <div className="flex items-center gap-3">
             <Palette className="text-sc-accent" size={24} />
@@ -336,21 +377,64 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                     Обход блокировок SoundCloud (Режим для РФ без системного VPN)
                   </h4>
                   <p className="text-xs text-sc-text-secondary mt-0.5">
-                    Позволяет слушать музыку и загружать треки напрямую внутри приложения без включения общего VPN на компьютере.
+                    Слушайте музыку и скачивайте треки на полной скорости без включения общего VPN на компьютере.
                   </p>
                 </div>
+
+                <button
+                  onClick={handleDetectProxy}
+                  disabled={detecting}
+                  className="flex items-center gap-1.5 rounded-sc border border-sc-border bg-sc-surface px-3 py-1.5 text-xs font-semibold text-white hover:border-sc-accent transition-colors disabled:opacity-50"
+                  title="Сканировать запущенные локальные клиенты"
+                >
+                  <RefreshCw size={13} className={detecting ? 'animate-spin' : ''} />
+                  <span>{detecting ? 'Поиск...' : 'Авто-поиск'}</span>
+                </button>
               </div>
 
-              <div className="rounded-sc border border-sc-border bg-[#141414] p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-xs font-bold text-white">Встроенный DNS-over-HTTPS (DoH)</span>
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-extrabold px-1.5 py-0.5 rounded">
+              {detectedProxy && (
+                <div className="rounded-sc border border-emerald-500/40 bg-emerald-950/25 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-white">
+                          Обнаружен активный клиент: {detectedProxy.name}
+                        </span>
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-extrabold px-1.5 py-0.5 rounded">
+                          Готов к работе
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-sc-text-secondary font-mono block mt-0.5">
+                        {detectedProxy.proxy}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setProxyInput(detectedProxy.proxy);
+                      handleApplyProxy(detectedProxy.proxy);
+                    }}
+                    className="rounded-sc bg-emerald-500 hover:bg-emerald-400 px-4 py-2 text-xs font-bold text-black transition-colors shrink-0 shadow-md"
+                  >
+                    Подключить в 1 клик
+                  </button>
+                </div>
+              )}
+
+              <div className="rounded-sc border border-sc-border bg-[#141414] p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    Встроенный DNS-over-HTTPS (DoH)
+                  </span>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-bold px-1.5 py-0.5 rounded">
                     Активен
                   </span>
                 </div>
-                <p className="text-xs text-sc-text-secondary leading-relaxed">
-                  В движок приложения встроен прямой защищённый резолвер Cloudflare 1.1.1.1 и Google DNS, который автоматически обходит DNS-подмену интернет-провайдеров.
+                <p className="text-[11px] text-sc-text-secondary leading-relaxed">
+                  DoH обходит только подмену DNS со стороны провайдеров. Однако в РФ интернет-провайдеры блокируют также аудиопотоки SoundCloud на уровне сетевых пакетов (DPI по имени в ClientHello). Если DoH работает медленно или треки прерываются, используйте прокси-туннель ниже.
                 </p>
               </div>
 
@@ -360,14 +444,14 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                     Встроенный прокси-туннель (SOCKS5 / HTTP)
                   </label>
                   <p className="text-[11px] text-sc-text-secondary mb-3">
-                    Укажи адрес любого локального или внешнего прокси. Трафик будет идти через прокси только для SoundCloud, не замедляя остальной интернет.
+                    Трафик маршрутизируется через прокси только для SoundCloud — браузер, игры и мессенджеры работают напрямую без потери скорости.
                   </p>
                   <input
                     type="text"
                     value={proxyInput}
                     onChange={(e) => setProxyInput(e.target.value)}
-                    placeholder="socks5://127.0.0.1:10808 или http://127.0.0.1:7890"
-                    className="w-full rounded-sc border border-sc-border bg-[#1a1a1a] px-3.5 py-2 text-xs text-white placeholder:text-sc-text-secondary focus:border-sc-accent focus:outline-none"
+                    placeholder="http://127.0.0.1:39706 или socks5://127.0.0.1:1080"
+                    className="w-full rounded-sc border border-sc-border bg-[#1a1a1a] px-3.5 py-2 text-xs text-white placeholder:text-sc-text-secondary focus:border-sc-accent focus:outline-none font-mono"
                   />
                 </div>
 
@@ -404,28 +488,34 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                   </span>
                   <div className="flex flex-wrap gap-2">
                     <button
-                      onClick={() => setProxyInput('socks5://127.0.0.1:10808')}
-                      className="text-[11px] px-2.5 py-1 rounded bg-[#202020] border border-sc-border text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors"
+                      onClick={() => setProxyInput('http://127.0.0.1:39706')}
+                      className="text-[11px] px-2.5 py-1 rounded bg-[#202020] border border-sc-border text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors font-mono"
                     >
-                      v2rayN / Xray (socks5://127.0.0.1:10808)
+                      Clash Verge (39706)
                     </button>
                     <button
                       onClick={() => setProxyInput('socks5://127.0.0.1:1080')}
-                      className="text-[11px] px-2.5 py-1 rounded bg-[#202020] border border-sc-border text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors"
+                      className="text-[11px] px-2.5 py-1 rounded bg-[#202020] border border-sc-border text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors font-mono"
                     >
-                      Zapret / ByeDPI (socks5://127.0.0.1:1080)
+                      Zapret / ByeDPI (1080)
+                    </button>
+                    <button
+                      onClick={() => setProxyInput('socks5://127.0.0.1:10808')}
+                      className="text-[11px] px-2.5 py-1 rounded bg-[#202020] border border-sc-border text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors font-mono"
+                    >
+                      v2rayN / Xray (10808)
                     </button>
                     <button
                       onClick={() => setProxyInput('http://127.0.0.1:7890')}
-                      className="text-[11px] px-2.5 py-1 rounded bg-[#202020] border border-sc-border text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors"
+                      className="text-[11px] px-2.5 py-1 rounded bg-[#202020] border border-sc-border text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors font-mono"
                     >
-                      Clash / Flclash (http://127.0.0.1:7890)
+                      Clash / Flclash (7890)
                     </button>
                     <button
                       onClick={() => setProxyInput('socks5://127.0.0.1:9050')}
-                      className="text-[11px] px-2.5 py-1 rounded bg-[#202020] border border-sc-border text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors"
+                      className="text-[11px] px-2.5 py-1 rounded bg-[#202020] border border-sc-border text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors font-mono"
                     >
-                      Tor (socks5://127.0.0.1:9050)
+                      Tor (9050)
                     </button>
                   </div>
                 </div>
