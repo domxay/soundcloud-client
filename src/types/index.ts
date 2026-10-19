@@ -6,6 +6,8 @@ export interface Track {
   duration: number;
   plays: string;
   liked: boolean;
+  created_at?: string;
+  display_date?: string;
   waveform?: number[];
   waveform_url?: string;
   streamUrl?: string;
@@ -29,6 +31,8 @@ export interface Playlist {
   artist: string;
   artwork: string;
   updatedDaysAgo: number;
+  created_at?: string;
+  updated_at?: string;
   tracks: Track[];
 }
 

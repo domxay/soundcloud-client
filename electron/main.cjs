@@ -79,8 +79,100 @@ async function fetchText(url) {
   return buf.toString('utf-8');
 }
 
-app.commandLine.appendSwitch('enable-features', 'DnsOverHttps');
-app.commandLine.appendSwitch('dns-over-https-templates', 'https://freedns.controld.com/p0 https://dns.adguard-dns.com/dns-query https://1.1.1.1/dns-query{?dns} https://8.8.8.8/dns-query{?dns}');
+function getNetworkSettingsPath() {
+  return path.join(app.getPath('userData'), 'network-settings.json');
+}
+function loadNetworkSettings() {
+  try {
+    const file = getNetworkSettingsPath();
+    if (fs.existsSync(file)) {
+      const data = JSON.parse(fs.readFileSync(file, 'utf-8'));
+      if (data && typeof data === 'object') return data;
+    }
+  } catch {}
+  return { dohEnabled: true, builtinProxyEnabled: false, builtinProxyPort: 8899 };
+}
+function saveNetworkSettings(settings) {
+  try {
+    fs.writeFileSync(getNetworkSettingsPath(), JSON.stringify(settings || {}), 'utf-8');
+  } catch {}
+}
+
+const __netSettings = loadNetworkSettings();
+if (__netSettings.dohEnabled !== false) {
+  app.commandLine.appendSwitch('enable-features', 'DnsOverHttps');
+  app.commandLine.appendSwitch('dns-over-https-templates', 'https://freedns.controld.com/p0 https://dns.adguard-dns.com/dns-query https://1.1.1.1/dns-query{?dns} https://8.8.8.8/dns-query{?dns}');
+}
+
+
+let builtinProxyServer = null;
+let builtinProxyPort = 8899;
+
+function startBuiltinProxy(port) {
+  return new Promise((resolve) => {
+    if (builtinProxyServer) {
+      resolve({ success: true, port: builtinProxyPort });
+      return;
+    }
+    builtinProxyPort = port || 8899;
+    const server = http.createServer((req, res) => {
+      let targetUrl = req.url;
+      if (!targetUrl.startsWith('http')) {
+        targetUrl = 'http://' + (req.headers.host || 'localhost') + req.url;
+      }
+      let target;
+      try { target = new URL(targetUrl); } catch {
+        res.statusCode = 400; res.end('Bad Request'); return;
+      }
+      const client = target.protocol === 'https:' ? https : http;
+      const options = {
+        hostname: target.hostname,
+        port: target.port || (target.protocol === 'https:' ? 443 : 80),
+        path: target.pathname + target.search,
+        method: req.method,
+        headers: Object.assign({}, req.headers, { host: target.host }),
+      };
+      delete options.headers['proxy-connection'];
+      const proxyReq = client.request(options, (proxyRes) => {
+        res.writeHead(proxyRes.statusCode, proxyRes.headers);
+        proxyRes.pipe(res);
+      });
+      proxyReq.on('error', (e) => { if (!res.headersSent) res.statusCode = 502; res.end(e.message); });
+      req.pipe(proxyReq);
+    });
+
+    server.on('connect', (req, clientSocket, head) => {
+      const parts = (req.url || '').split(':');
+      const host = parts[0];
+      const port = parseInt(parts[1], 10) || 443;
+      const serverSocket = netSocket.connect(port, host, () => {
+        clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+        if (head && head.length) serverSocket.write(head);
+        serverSocket.pipe(clientSocket);
+        clientSocket.pipe(serverSocket);
+      });
+      serverSocket.on('error', () => { try { clientSocket.end(); } catch {} });
+      clientSocket.on('error', () => { try { serverSocket.end(); } catch {} });
+    });
+
+    server.on('error', (e) => {
+      builtinProxyServer = null;
+      resolve({ success: false, error: e.message });
+    });
+    server.listen(builtinProxyPort, '127.0.0.1', () => {
+      builtinProxyServer = server;
+      resolve({ success: true, port: builtinProxyPort });
+    });
+  });
+}
+
+function stopBuiltinProxy() {
+  if (builtinProxyServer) {
+    try { builtinProxyServer.close(); } catch {}
+    builtinProxyServer = null;
+  }
+  return { success: true };
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -421,15 +513,62 @@ ipcMain.handle('sc:open-downloads-folder', () => {
   return true;
 });
 
+
+ipcMain.handle('sc:get-network-settings', () => loadNetworkSettings());
+ipcMain.handle('sc:set-doh', (event, enabled) => {
+  const settings = loadNetworkSettings();
+  settings.dohEnabled = !!enabled;
+  saveNetworkSettings(settings);
+  return { success: true, requiresRestart: true };
+});
+ipcMain.handle('sc:builtin-proxy-start', async (event, port) => {
+  const res = await startBuiltinProxy(port || 8899);
+  if (res.success) {
+    const settings = loadNetworkSettings();
+    settings.builtinProxyEnabled = true;
+    settings.builtinProxyPort = res.port;
+    saveNetworkSettings(settings);
+    currentProxyRule = 'http://127.0.0.1:' + res.port;
+    saveProxySettings(currentProxyRule);
+    const config = { proxyRules: currentProxyRule };
+    try { if (session.defaultSession) await session.defaultSession.setProxy(config); } catch {}
+    try { if (mainWindow && mainWindow.webContents.session) await mainWindow.webContents.session.setProxy(config); } catch {}
+  }
+  return res;
+});
+ipcMain.handle('sc:builtin-proxy-stop', async () => {
+  stopBuiltinProxy();
+  const settings = loadNetworkSettings();
+  settings.builtinProxyEnabled = false;
+  saveNetworkSettings(settings);
+  currentProxyRule = null;
+  saveProxySettings(null);
+  const config = { mode: 'direct' };
+  try { if (session.defaultSession) await session.defaultSession.setProxy(config); } catch {}
+  try { if (mainWindow && mainWindow.webContents.session) await mainWindow.webContents.session.setProxy(config); } catch {}
+  return { success: true };
+});
+ipcMain.handle('sc:builtin-proxy-status', () => ({ running: !!builtinProxyServer, port: builtinProxyPort }));
+ipcMain.handle('sc:relaunch-app', () => { app.relaunch(); app.quit(); return { success: true }; });
+
 app.whenReady().then(async () => {
-  const saved = loadSavedProxy();
-  if (saved) {
-    currentProxyRule = saved;
-  } else {
-    const detected = await detectLocalProxy();
-    if (detected.success && detected.proxy) {
-      currentProxyRule = detected.proxy;
+  const ns = loadNetworkSettings();
+  if (ns.builtinProxyEnabled) {
+    const res = await startBuiltinProxy(ns.builtinProxyPort || 8899);
+    if (res.success) {
+      currentProxyRule = 'http://127.0.0.1:' + res.port;
       saveProxySettings(currentProxyRule);
+    }
+  } else {
+    const saved = loadSavedProxy();
+    if (saved) {
+      currentProxyRule = saved;
+    } else {
+      const detected = await detectLocalProxy();
+      if (detected.success && detected.proxy) {
+        currentProxyRule = detected.proxy;
+        saveProxySettings(currentProxyRule);
+      }
     }
   }
   if (currentProxyRule && session.defaultSession) {

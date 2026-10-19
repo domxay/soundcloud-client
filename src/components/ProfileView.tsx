@@ -35,19 +35,24 @@ export default function ProfileView({
 
   useEffect(() => {
     let isMounted = true;
-    setLoading(true);
-    Promise.all([
-      soundcloudApi.getUserPlayHistory(),
-      soundcloudApi.getUserLikes(),
-      soundcloudApi.getUserPlaylists(),
-    ]).then(([history, likes, playlists]) => {
-      if (isMounted) {
-        setHistoryTracks(history);
-        setLikedTracks(likes);
-        setUserPlaylists(playlists);
-        setLoading(false);
-      }
-    });
+    const load = (silent = false) => {
+      if (!silent) setLoading(true);
+      Promise.all([
+        soundcloudApi.getUserPlayHistory(),
+        soundcloudApi.getUserLikes(),
+        soundcloudApi.getUserPlaylists(),
+      ]).then(([history, likes, playlists]) => {
+        if (isMounted) {
+          setHistoryTracks(history);
+          setLikedTracks(likes);
+          setUserPlaylists(playlists);
+          if (!silent) setLoading(false);
+        }
+      }).catch(() => {
+        if (isMounted && !silent) setLoading(false);
+      });
+    };
+    load();
 
     const unsub = soundcloudApi.subscribeLikes((trackId, isLiked) => {
       setLikedTracks((prev) => {
@@ -66,9 +71,19 @@ export default function ProfileView({
       );
     });
 
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') load(true);
+    }, 120000);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') load(true);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
     return () => {
       isMounted = false;
       unsub();
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
 

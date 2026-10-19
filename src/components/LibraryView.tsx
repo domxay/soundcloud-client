@@ -33,8 +33,8 @@ export default function LibraryView({
   const [selectedPlaylistView, setSelectedPlaylistView] = useState<Playlist | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const reloadData = () => {
-    setLoading(true);
+  const reloadData = (silent = false) => {
+    if (!silent) setLoading(true);
     Promise.all([
       soundcloudApi.getUserPlaylists(),
       soundcloudApi.getUserLikes(),
@@ -45,7 +45,9 @@ export default function LibraryView({
       setLikes(lList);
       setHistory(hList);
       setTrending(tList);
-      setLoading(false);
+      if (!silent) setLoading(false);
+    }).catch(() => {
+      if (!silent) setLoading(false);
     });
   };
 
@@ -64,7 +66,20 @@ export default function LibraryView({
         }
       });
     });
-    return unsub;
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') reloadData(true);
+    }, 120000);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') reloadData(true);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      unsub();
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   const handlePlaylistClick = (p: Playlist) => {

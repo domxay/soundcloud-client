@@ -8,6 +8,7 @@ import LoginModal from '@/components/LoginModal';
 import DownloadsView from '@/components/DownloadsView';
 import ProfileView from '@/components/ProfileView';
 import LibraryView from '@/components/LibraryView';
+import PlaylistsView from '@/components/PlaylistsView';
 import CommentsModal from '@/components/CommentsModal';
 import LyricsModal from '@/components/LyricsModal';
 import ThemeSettingsModal from '@/components/ThemeSettingsModal';
@@ -186,38 +187,28 @@ function App() {
           tracks: history,
         });
       } else {
-        const likes = await soundcloudApi.getUserLikes();
-        if (likes.length > 0) {
-          setTracks(likes);
-          setCurrentTrack(likes[0]);
-          setDuration(likes[0].duration);
+        const trending = await soundcloudApi.getTrendingTracks();
+        if (trending.length > 0) {
+          setTracks(trending);
+          setCurrentTrack(trending[0]);
+          setDuration(trending[0].duration);
           setCurrentPlaylist({
-            id: 2,
-            title: 'Liked Tracks',
-            artist: user?.username || 'Me',
-            artwork: likes[0]?.artwork || emptyPlaylist.artwork,
+            id: 3,
+            title: 'Discover SoundCloud Top Stream',
+            artist: 'SoundCloud Curated',
+            artwork: trending[0]?.artwork || emptyPlaylist.artwork,
             updatedDaysAgo: 0,
-            tracks: likes,
+            tracks: trending,
           });
-        } else {
-          const trending = await soundcloudApi.getTrendingTracks();
-          if (trending.length > 0) {
-            setTracks(trending);
-            setCurrentTrack(trending[0]);
-            setDuration(trending[0].duration);
-            setCurrentPlaylist({
-              id: 3,
-              title: 'Discover SoundCloud Top Stream',
-              artist: 'SoundCloud Curated',
-              artwork: trending[0]?.artwork || emptyPlaylist.artwork,
-              updatedDaysAgo: 0,
-              tracks: trending,
-            });
-          }
         }
       }
     } catch {
-      setIsLoginModalOpen(true);
+      const fallback = await soundcloudApi.getTrendingTracks();
+      if (fallback.length > 0) {
+        setTracks(fallback);
+        setCurrentTrack(fallback[0]);
+        setDuration(fallback[0].duration);
+      }
     } finally {
       setLoading(false);
     }
@@ -227,14 +218,48 @@ function App() {
     loadUserData();
   }, [loadUserData]);
 
+  useEffect(() => {
+    const refreshStream = async () => {
+      if (activeTab !== 'Stream') return;
+      try {
+        let streamTracks: Track[] = [];
+        if (authService.isAuthenticated()) {
+          streamTracks = await soundcloudApi.getUserPlayHistory();
+        }
+        if (streamTracks.length === 0) {
+          streamTracks = await soundcloudApi.getTrendingTracks();
+        }
+        if (streamTracks.length === 0) return;
+        setTracks((prev) => {
+          const ids = new Set(prev.map((t) => t.id));
+          const newOnes = streamTracks.filter((t) => !ids.has(t.id));
+          const updated = prev.map((t) => {
+            const inc = streamTracks.find((h) => h.id === t.id);
+            return inc ? { ...t, ...inc, liked: t.liked || inc.liked } : t;
+          });
+          const merged = [...newOnes, ...updated].slice(0, Math.max(prev.length, streamTracks.length));
+          setCurrentPlaylist((p) => ({ ...p, tracks: merged }));
+          return merged;
+        });
+      } catch {}
+    };
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') refreshStream();
+    }, 60000);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refreshStream();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [activeTab]);
+
   const handleTabChange = async (tab: string) => {
     setActiveTab(tab);
-    if (!authService.isAuthenticated()) {
-      setIsLoginModalOpen(true);
-      return;
-    }
-
-    if (tab === 'Profile' || tab === 'Downloads' || tab === 'Library') {
+    if (tab === 'Home' || tab === 'Profile' || tab === 'Downloads' || tab === 'Library' || tab === 'Playlists') {
       return;
     }
 
@@ -247,7 +272,7 @@ function App() {
           setCurrentPlaylist({
             id: 999,
             title: 'My Liked Tracks',
-            artist: authService.getSession().user?.username || 'Me',
+            artist: authService.getSession().user?.username || 'Guest',
             artwork: likes[0]?.artwork || emptyPlaylist.artwork,
             updatedDaysAgo: 0,
             tracks: likes,
@@ -258,29 +283,26 @@ function App() {
           setCurrentPlaylist({
             id: 999,
             title: 'Liked Tracks (Empty - Discover Below)',
-            artist: authService.getSession().user?.username || 'Me',
+            artist: 'SoundCloud',
             artwork: trending[0]?.artwork || emptyPlaylist.artwork,
             updatedDaysAgo: 0,
             tracks: trending,
           });
         }
-      } else if (tab === 'Playlists') {
-        const playlists = await soundcloudApi.getUserPlaylists();
-        if (playlists.length > 0) {
-          setCurrentPlaylist(playlists[0]);
-          setTracks(playlists[0].tracks);
-        }
       } else if (tab === 'Stream') {
-        const history = await soundcloudApi.getUserPlayHistory();
-        if (history.length > 0) {
-          setTracks(history);
+        let streamTracks = await soundcloudApi.getUserPlayHistory();
+        if (streamTracks.length === 0) {
+          streamTracks = await soundcloudApi.getTrendingTracks();
+        }
+        if (streamTracks.length > 0) {
+          setTracks(streamTracks);
           setCurrentPlaylist({
             id: 1,
-            title: 'Recently Played Stream',
-            artist: authService.getSession().user?.username || 'Me',
-            artwork: history[0]?.artwork || emptyPlaylist.artwork,
+            title: authService.isAuthenticated() ? 'Personal Stream' : 'Live Global Stream',
+            artist: authService.getSession().user?.username || 'SoundCloud Live',
+            artwork: streamTracks[0]?.artwork || emptyPlaylist.artwork,
             updatedDaysAgo: 0,
-            tracks: history,
+            tracks: streamTracks,
           });
         }
       }
@@ -424,44 +446,7 @@ function App() {
       />
 
       <main className="mx-auto max-w-[1400px] w-full flex-1 relative z-10 flex flex-col">
-        {!authService.isAuthenticated() ? (
-          <div className="flex-1 flex flex-col items-center justify-center py-24 px-4 text-center">
-            <div className="w-full max-w-md rounded-sc border border-sc-border bg-sc-surface p-8 shadow-2xl">
-              <div className="flex justify-center mb-5">
-                <div className="h-16 w-16 rounded-full bg-sc-accent/15 border border-sc-accent/30 flex items-center justify-center text-sc-accent">
-                  <Cloud size={36} fill="currentColor" />
-                </div>
-              </div>
-
-              <h1 className="text-2xl font-black text-white tracking-tight">
-                Welcome to SoundCloud
-              </h1>
-              <p className="text-xs text-sc-text-secondary mt-2 mb-8 leading-relaxed">
-                Sign in with your personal SoundCloud account to unlock your personalized stream, playlists, liked tracks, synchronized karaoke lyrics, and audio downloader.
-              </p>
-
-              <div className="space-y-3">
-                <button
-                  onClick={() => setIsLoginModalOpen(true)}
-                  className="w-full flex items-center justify-center gap-2.5 rounded-sc bg-sc-accent py-3 px-5 text-xs font-bold text-white hover:bg-sc-accent-hover transition-colors shadow-lg shadow-sc-accent/25"
-                >
-                  <Cloud size={16} fill="white" />
-                  Sign In with SoundCloud
-                </button>
-              </div>
-
-              <div className="mt-8 pt-5 border-t border-sc-border flex items-center justify-between text-[11px] text-sc-text-secondary">
-                <span>In Russia without VPN?</span>
-                <button
-                  onClick={() => setIsThemeModalOpen(true)}
-                  className="text-sc-accent font-semibold hover:underline"
-                >
-                  Open Bypass / Network
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : activeTab === 'Home' ? (
+        {activeTab === 'Home' ? (
           <HomeView
             currentTrackId={currentTrack?.id ?? null}
             isPlaying={isPlaying}
@@ -472,6 +457,17 @@ function App() {
             onSelectPlaylist={handleSelectPlaylist}
             onOpenComments={handleOpenCommentsModal}
             onNavigateTab={handleTabChange}
+          />
+        ) : activeTab === 'Playlists' ? (
+          <PlaylistsView
+            currentTrackId={currentTrack?.id ?? null}
+            isPlaying={isPlaying}
+            downloadingIds={downloadingIds}
+            onTrackPlay={handleTrackPlay}
+            onLikeToggle={handleLikeToggle}
+            onDownload={handleDownload}
+            onSelectPlaylist={handleSelectPlaylist}
+            onOpenComments={handleOpenCommentsModal}
           />
         ) : activeTab === 'Library' ? (
           <LibraryView
@@ -528,7 +524,7 @@ function App() {
         )}
       </main>
 
-      {authService.isAuthenticated() && currentTrack && (
+      {currentTrack && (
         <PlayerBar
           track={currentTrack}
           isPlaying={isPlaying}

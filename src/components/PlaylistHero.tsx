@@ -1,5 +1,6 @@
 import { Play, Download, Heart, Share2, Music2, Loader2 } from 'lucide-react';
 import { Playlist } from '@/types';
+import { formatRelativeTime } from '@/services/utils';
 
 interface PlaylistHeroProps {
   playlist: Playlist;
@@ -48,7 +49,7 @@ export default function PlaylistHero({
         <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 text-sm text-sc-text-secondary">
           <span className="font-semibold text-sc-accent hover:underline cursor-pointer">{playlist.artist}</span>
           <span>•</span>
-          <span>Updated {playlist.updatedDaysAgo} days ago</span>
+          <span>{playlist.updated_at ? `Updated ${formatRelativeTime(playlist.updated_at)}` : `Updated ${playlist.updatedDaysAgo} days ago`}</span>
           <span>•</span>
           <span>{playlist.tracks.length} tracks</span>
           <span>•</span>

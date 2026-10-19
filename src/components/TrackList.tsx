@@ -1,6 +1,6 @@
 import { Play, Pause, Heart, Download, MoreHorizontal, Loader2, MessageSquare } from 'lucide-react';
 import { Track } from '@/types';
-import { formatTime } from '@/services/utils';
+import { formatTime, formatRelativeTime } from '@/services/utils';
 import Waveform from './Waveform';
 
 interface TrackListProps {
@@ -87,6 +87,11 @@ export default function TrackList({
                   <p className={`truncate text-sm font-medium ${isCurrent ? 'text-sc-accent font-semibold' : 'text-white'}`}>
                     {track.title}
                   </p>
+                  {(track.created_at || track.display_date) && (
+                    <p className="text-[10px] text-sc-text-secondary/70 truncate mt-0.5">
+                      Uploaded {formatRelativeTime(track.created_at || track.display_date)}
+                    </p>
+                  )}
                   <div className="mt-1">
                     <Waveform
                       waveformUrl={track.waveform_url}

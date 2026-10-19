@@ -26,5 +26,11 @@ interface Window {
     selectBackgroundFile: () => Promise<{ url: string; type: 'video' | 'image' } | null>;
     setProxy: (rule: string | null) => Promise<{ success: boolean; proxy?: string | null }>;
     detectLocalProxy?: () => Promise<{ success: boolean; proxy?: string; name?: string }>;
+    getNetworkSettings?: () => Promise<{ dohEnabled?: boolean; builtinProxyEnabled?: boolean; builtinProxyPort?: number }>;
+    setDoh?: (enabled: boolean) => Promise<{ success: boolean; requiresRestart?: boolean }>;
+    builtinProxyStart?: (port: number) => Promise<{ success: boolean; port?: number; error?: string }>;
+    builtinProxyStop?: () => Promise<{ success: boolean }>;
+    builtinProxyStatus?: () => Promise<{ running: boolean; port: number }>;
+    relaunchApp?: () => Promise<{ success: boolean }>;
   };
 }

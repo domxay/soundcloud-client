@@ -7,9 +7,19 @@ const LOCAL_LIKES_KEY = 'sc_local_likes';
 export class SoundCloudApi {
   private static instance: SoundCloudApi;
   private trackRegistry: Map<number, Track> = new Map();
+  private streamUrlCache: Map<number, { url: string; ts: number }> = new Map();
   private likeListeners: Set<(trackId: number, isLiked: boolean) => void> = new Set();
 
   private constructor() {}
+
+  private daysAgo(date?: string): number {
+    if (!date) return 1;
+    const ts = new Date(date).getTime();
+    if (isNaN(ts)) return 1;
+    const diff = Date.now() - ts;
+    const days = Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+    return days === 0 ? 0 : days;
+  }
 
   public static getInstance(): SoundCloudApi {
     if (!SoundCloudApi.instance) {
@@ -91,7 +101,15 @@ export class SoundCloudApi {
   }
 
   public async getTrackStreamUrl(track: Track): Promise<string | null> {
-    if (track.streamUrl) return track.streamUrl;
+    const cached = this.streamUrlCache.get(track.id);
+    if (cached && Date.now() - cached.ts < 300000) {
+      track.streamUrl = cached.url;
+      return cached.url;
+    }
+    if (track.streamUrl) {
+      this.streamUrlCache.set(track.id, { url: track.streamUrl, ts: Date.now() });
+      return track.streamUrl;
+    }
 
     let transcodings = track.media?.transcodings;
     if (!transcodings || transcodings.length === 0) {
@@ -122,7 +140,12 @@ export class SoundCloudApi {
       });
       if (!res.ok) return null;
       const data = await res.json();
-      return data.url || null;
+      const streamUrl = data.url || null;
+      if (streamUrl) {
+        track.streamUrl = streamUrl;
+        this.streamUrlCache.set(track.id, { url: streamUrl, ts: Date.now() });
+      }
+      return streamUrl;
     } catch {
       return null;
     }
@@ -316,46 +339,12 @@ export class SoundCloudApi {
 
   public async getUserPlaylists(): Promise<Playlist[]> {
     const session = authService.getSession();
-    const userId = session.user?.id || 1764659103;
+    const userId = session.user?.id;
     const playlists: Playlist[] = [];
 
-    try {
-      const res = await fetch(this.buildUrl(`/users/${userId}/playlists`, { limit: 20 }), {
-        headers: this.getHeaders(),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const collection = data.collection || [];
-        for (const item of collection) {
-          const p = item.playlist || item;
-          const resolvedTracks = await this.resolvePlaylistTracks(p.tracks || []);
-          playlists.push({
-            id: p.id,
-            title: p.title,
-            artist: p.user?.username || 'Unknown',
-            artwork: p.artwork_url || p.user?.avatar_url || 'https://images.pexels.com/photos/35113490/pexels-photo-35113490.jpeg?auto=compress&cs=tinysrgb&h=400&w=400',
-            updatedDaysAgo: 1,
-            tracks: resolvedTracks,
-          });
-        }
-      }
-    } catch {}
-
-    if (playlists.length === 0) {
-      const featured = await this.getFeaturedPlaylists();
-      playlists.push(...featured);
-    }
-
-    return playlists;
-  }
-
-  public async getFeaturedPlaylists(): Promise<Playlist[]> {
-    const queries = ['Top Hits 2026', 'Phonk 2026', 'Cyberpunk Synthwave', 'Hip Hop Essentials'];
-    const playlists: Playlist[] = [];
-
-    for (const q of queries) {
+    if (userId) {
       try {
-        const res = await fetch(this.buildUrl('/search/playlists', { q, limit: 2 }), {
+        const res = await fetch(this.buildUrl(`/users/${userId}/playlists`, { limit: 20 }), {
           headers: this.getHeaders(),
         });
         if (res.ok) {
@@ -363,30 +352,151 @@ export class SoundCloudApi {
           const collection = data.collection || [];
           for (const item of collection) {
             const p = item.playlist || item;
-            if (p.tracks && p.tracks.length > 0) {
-              const resolvedTracks = await this.resolvePlaylistTracks(p.tracks.slice(0, 30));
-              if (resolvedTracks.length > 0) {
-                playlists.push({
-                  id: p.id,
-                  title: p.title,
-                  artist: p.user?.username || 'SoundCloud Curated',
-                  artwork: p.artwork_url || p.user?.avatar_url || 'https://images.pexels.com/photos/35113490/pexels-photo-35113490.jpeg?auto=compress&cs=tinysrgb&h=400&w=400',
-                  updatedDaysAgo: 1,
-                  tracks: resolvedTracks,
-                });
-              }
-            }
+            const resolvedTracks = await this.resolvePlaylistTracks(p.tracks || []);
+            const fallbackArtwork = resolvedTracks.length > 0 ? resolvedTracks[0].artwork : '';
+            playlists.push({
+              id: p.id,
+              title: p.title,
+              artist: p.user?.username || session.user?.username || 'You',
+              artwork: p.artwork_url || fallbackArtwork || p.user?.avatar_url || '',
+              updatedDaysAgo: this.daysAgo(p.last_modified || p.created_at),
+              created_at: p.created_at,
+              updated_at: p.last_modified || p.updated_at,
+              tracks: resolvedTracks,
+            });
           }
         }
       } catch {}
+    }
+
+    const featured = await this.getFeaturedPlaylists();
+    const existingIds = new Set(playlists.map((p) => p.id));
+    for (const f of featured) {
+      if (!existingIds.has(f.id)) {
+        playlists.push(f);
+      }
+    }
+
+    return playlists;
+  }
+
+  public async getPlaylistDetails(playlistId: number): Promise<Playlist | null> {
+    try {
+      const res = await fetch(this.buildUrl(`/playlists/${playlistId}`), {
+        headers: this.getHeaders(),
+      });
+      if (!res.ok) return null;
+      const p = await res.json();
+      const resolvedTracks = await this.resolvePlaylistTracks(p.tracks || []);
+      const fallbackArtwork = resolvedTracks.length > 0 ? resolvedTracks[0].artwork : '';
+      return {
+        id: p.id,
+        title: p.title || 'SoundCloud Playlist',
+        artist: p.user?.username || 'SoundCloud Curated',
+        artwork: p.artwork_url || fallbackArtwork || p.user?.avatar_url || '',
+        updatedDaysAgo: this.daysAgo(p.last_modified || p.created_at),
+        created_at: p.created_at,
+        updated_at: p.last_modified || p.updated_at,
+        tracks: resolvedTracks,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  public async getFeaturedPlaylists(): Promise<Playlist[]> {
+    const playlists: Playlist[] = [];
+
+    try {
+      const res = await fetch(this.buildUrl('/mixed-selections', { limit: 10 }), {
+        headers: this.getHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        for (const section of data.collection || []) {
+          for (const item of section.items?.collection || []) {
+            if (item.kind === 'playlist' || item.id) {
+              const fallbackArtwork = item.artwork_url || item.user?.avatar_url || '';
+              const resolvedTracks = item.tracks ? await this.resolvePlaylistTracks(item.tracks.slice(0, 35)) : [];
+              playlists.push({
+                id: item.id,
+                title: item.title,
+                artist: item.user?.username || section.title || 'Curated',
+                artwork: fallbackArtwork,
+                updatedDaysAgo: this.daysAgo(item.last_modified || item.created_at),
+                created_at: item.created_at,
+                updated_at: item.last_modified || item.updated_at,
+                tracks: resolvedTracks,
+              });
+            }
+          }
+        }
+      }
+    } catch {}
+
+    if (playlists.length < 5) {
+      const queries = ['Top Hits 2026', 'Phonk 2026', 'Cyberpunk Synthwave', 'Hip Hop Essentials'];
+      for (const q of queries) {
+        try {
+          const res = await fetch(this.buildUrl('/search/playlists', { q, limit: 3 }), {
+            headers: this.getHeaders(),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            for (const item of data.collection || []) {
+              const p = item.playlist || item;
+              if (p.tracks && p.tracks.length > 0) {
+                const resolvedTracks = await this.resolvePlaylistTracks(p.tracks.slice(0, 25));
+                if (resolvedTracks.length > 0) {
+                  playlists.push({
+                    id: p.id,
+                    title: p.title,
+                    artist: p.user?.username || 'SoundCloud Curated',
+                    artwork: p.artwork_url || resolvedTracks[0]?.artwork || '',
+                    updatedDaysAgo: this.daysAgo(p.last_modified || p.created_at),
+                    created_at: p.created_at,
+                    updated_at: p.last_modified || p.updated_at,
+                    tracks: resolvedTracks,
+                  });
+                }
+              }
+            }
+          }
+        } catch {}
+      }
     }
 
     return playlists;
   }
 
   public async getTrendingTracks(): Promise<Track[]> {
+    return this.getTopCharts();
+  }
+
+  public async getTopCharts(): Promise<Track[]> {
     try {
-      const res = await fetch(this.buildUrl('/search/tracks', { q: 'Hits 2026 Phonk Trap Electronic', limit: 30 }), {
+      const res = await fetch(this.buildUrl('/charts', { kind: 'trending', limit: 50 }), {
+        headers: this.getHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const collection = data.collection || [];
+        if (collection.length > 0) {
+          const localLikes = this.getLocalLikes();
+          const likedSet = new Set(localLikes.map((t) => t.id));
+          return collection.map((item: any) => {
+            const raw = item.track || item;
+            const t = this.mapRawTrack(raw);
+            if (likedSet.has(t.id)) t.liked = true;
+            this.registerTrack(t);
+            return t;
+          });
+        }
+      }
+    } catch {}
+
+    try {
+      const res = await fetch(this.buildUrl('/search/tracks', { q: 'Top 50 Hits 2026', limit: 35 }), {
         headers: this.getHeaders(),
       });
       if (!res.ok) return [];
@@ -394,7 +504,6 @@ export class SoundCloudApi {
       const collection = data.collection || [];
       const localLikes = this.getLocalLikes();
       const likedSet = new Set(localLikes.map((t) => t.id));
-
       return collection.map((raw: any) => {
         const t = this.mapRawTrack(raw);
         if (likedSet.has(t.id)) t.liked = true;
@@ -406,9 +515,9 @@ export class SoundCloudApi {
     }
   }
 
-  public async getTopCharts(): Promise<Track[]> {
+  public async getNewReleases(): Promise<Track[]> {
     try {
-      const res = await fetch(this.buildUrl('/search/tracks', { q: 'Top 50 Global Charts 2026', limit: 20 }), {
+      const res = await fetch(this.buildUrl('/search/tracks', { q: '2026 new releases music', limit: 30 }), {
         headers: this.getHeaders(),
       });
       if (!res.ok) return [];
@@ -416,7 +525,6 @@ export class SoundCloudApi {
       const collection = data.collection || [];
       const localLikes = this.getLocalLikes();
       const likedSet = new Set(localLikes.map((t) => t.id));
-
       return collection.map((raw: any) => {
         const t = this.mapRawTrack(raw);
         if (likedSet.has(t.id)) t.liked = true;
@@ -430,8 +538,8 @@ export class SoundCloudApi {
 
   public async getGenreTracks(genre: string): Promise<Track[]> {
     try {
-      const q = genre === 'All' ? 'Trending Hits 2026' : `${genre} Hits 2026`;
-      const res = await fetch(this.buildUrl('/search/tracks', { q, limit: 24 }), {
+      const q = genre === 'All' ? 'Trending Hits 2026' : `${genre} 2026`;
+      const res = await fetch(this.buildUrl('/search/tracks', { q, limit: 30 }), {
         headers: this.getHeaders(),
       });
       if (!res.ok) return [];
@@ -578,6 +686,8 @@ export class SoundCloudApi {
       duration: Math.round((raw.duration || 0) / 1000),
       plays: playsFormatted,
       liked: Boolean(raw.user_favorite),
+      created_at: raw.created_at || raw.display_date || undefined,
+      display_date: raw.display_date || raw.created_at || undefined,
       waveform_url: raw.waveform_url,
       media: raw.media,
     };

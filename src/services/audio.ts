@@ -21,6 +21,7 @@ export class AudioService {
 
   private constructor() {
     this.audio = new Audio();
+    this.audio.preload = 'auto';
     this.setupListeners();
   }
 
@@ -88,6 +89,15 @@ export class AudioService {
     this.repeatMode = repeat;
   }
 
+  private async getStreamUrlWithRetry(track: Track, attempts: number): Promise<string | null> {
+    for (let i = 0; i < attempts; i++) {
+      const url = await soundcloudApi.getTrackStreamUrl(track);
+      if (url) return url;
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+    }
+    return null;
+  }
+
   public async playTrack(track: Track): Promise<void> {
     this.currentTrack = track;
 
@@ -96,8 +106,11 @@ export class AudioService {
       this.hls = null;
     }
 
-    const streamUrl = await soundcloudApi.getTrackStreamUrl(track);
+    const streamUrl = await this.getStreamUrlWithRetry(track, 3);
     if (!streamUrl) {
+      if (this.onEndedCallback) {
+        setTimeout(() => this.onEndedCallback?.(), 0);
+      }
       return;
     }
 

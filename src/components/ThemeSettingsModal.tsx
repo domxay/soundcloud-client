@@ -17,6 +17,11 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
   const [proxyStatus, setProxyStatus] = useState<string | null>(null);
   const [detectedProxy, setDetectedProxy] = useState<{ proxy: string; name: string } | null>(null);
   const [detecting, setDetecting] = useState(false);
+  const [dohEnabled, setDohEnabled] = useState(true);
+  const [dohRestartRequired, setDohRestartRequired] = useState(false);
+  const [builtinProxyEnabled, setBuiltinProxyEnabled] = useState(false);
+  const [builtinProxyPort, setBuiltinProxyPort] = useState(8899);
+  const [builtinProxyStatus, setBuiltinProxyStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -34,6 +39,26 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
       setActiveProxy(saved);
     }
   }, []);
+  useEffect(() => {
+    if (!isOpen) return;
+    if (window.electronAPI?.getNetworkSettings) {
+      window.electronAPI.getNetworkSettings().then((st: any) => {
+        if (st) {
+          setDohEnabled(st.dohEnabled !== false);
+          setBuiltinProxyEnabled(!!st.builtinProxyEnabled);
+          if (st.builtinProxyPort) setBuiltinProxyPort(st.builtinProxyPort);
+        }
+      }).catch(() => {});
+    }
+    if (window.electronAPI?.builtinProxyStatus) {
+      window.electronAPI.builtinProxyStatus().then((st: any) => {
+        if (st) {
+          setBuiltinProxyEnabled(!!st.running);
+          if (st.port) setBuiltinProxyPort(st.port);
+        }
+      }).catch(() => {});
+    }
+  }, [isOpen]);
 
   const handleDetectProxy = async () => {
     if (window.electronAPI?.detectLocalProxy) {
@@ -140,6 +165,35 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
       setProxyStatus('Direct mode activated (Proxy disabled).');
     }
     setTimeout(() => setProxyStatus(null), 3000);
+  };
+
+  const handleDohToggle = async (enabled: boolean) => {
+    setDohEnabled(enabled);
+    if (window.electronAPI?.setDoh) {
+      await window.electronAPI.setDoh(enabled);
+    }
+    setDohRestartRequired(true);
+  };
+
+  const handleBuiltinProxyToggle = async () => {
+    if (builtinProxyEnabled) {
+      if (window.electronAPI?.builtinProxyStop) {
+        await window.electronAPI.builtinProxyStop();
+      }
+      setBuiltinProxyEnabled(false);
+      setBuiltinProxyStatus('Встроенный прокси остановлен.');
+    } else {
+      const port = Number(builtinProxyPort) || 8899;
+      const res = await window.electronAPI?.builtinProxyStart?.(port);
+      if (res?.success) {
+        setBuiltinProxyEnabled(true);
+        if (res.port) setBuiltinProxyPort(res.port);
+        setBuiltinProxyStatus('Встроенный прокси запущен: http://127.0.0.1:' + res.port);
+      } else {
+        setBuiltinProxyStatus(res?.error || 'Не удалось запустить встроенный прокси.');
+      }
+    }
+    setTimeout(() => setBuiltinProxyStatus(null), 4000);
   };
 
   return (
@@ -426,16 +480,63 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
               <div className="rounded-sc border border-sc-border bg-[#141414] p-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-white flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                    Встроенный DNS-over-HTTPS (DoH)
-                  </span>
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-bold px-1.5 py-0.5 rounded">
+                    <span className={`w-2 h-2 rounded-full ${dohEnabled ? 'bg-emerald-400' : 'bg-gray-500'}`} />
+      Встроенный DNS-over-HTTPS (DoH)
+    </span>
+    <button
+      onClick={() => handleDohToggle(!dohEnabled)}
+      className={`px-3 py-1 rounded text-[10px] font-bold transition-colors ${dohEnabled ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-500/20 text-gray-300'}`}
+    >
+      {dohEnabled ? 'Включено' : 'Отключено'}
+    </button>
+    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-bold px-1.5 py-0.5 rounded">
                     Активен
                   </span>
                 </div>
                 <p className="text-[11px] text-sc-text-secondary leading-relaxed">
                   DoH обходит только подмену DNS со стороны провайдеров. Однако в РФ интернет-провайдеры блокируют также аудиопотоки SoundCloud на уровне сетевых пакетов (DPI по имени в ClientHello). Если DoH работает медленно или треки прерываются, используйте прокси-туннель ниже.
                 </p>
+              </div>
+
+              <div className="rounded-sc border border-sc-border bg-[#141414] p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${builtinProxyEnabled ? 'bg-emerald-400' : 'bg-gray-500'}`} />
+                    Встроенный прокси (Embedded Proxy)
+                  </span>
+                  <button
+                    onClick={handleBuiltinProxyToggle}
+                    className={`px-3 py-1 rounded text-[10px] font-bold transition-colors ${builtinProxyEnabled ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-500/20 text-gray-300'}`}
+                  >
+                    {builtinProxyEnabled ? 'Запущен' : 'Остановлен'}
+                  </button>
+                </div>
+                <p className="text-[11px] text-sc-text-secondary leading-relaxed">
+                  Запускает локальный HTTP-прокси внутри приложения. Можно использовать как встроенный прокси для обхода блокировок без внешних программ.
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={builtinProxyPort}
+                    onChange={(e) => setBuiltinProxyPort(Number(e.target.value) || 8899)}
+                    className="w-24 rounded-sc border border-sc-border bg-[#1a1a1a] px-2 py-1 text-xs text-white"
+                  />
+                  <span className="text-[11px] text-sc-text-secondary">порт</span>
+                </div>
+                {builtinProxyEnabled && (
+                  <div className="text-[11px] text-emerald-400 font-mono">
+                    http://127.0.0.1:{builtinProxyPort}
+                  </div>
+                )}
+                {builtinProxyStatus && (
+                  <div className="text-[11px] text-emerald-400">{builtinProxyStatus}</div>
+                )}
+                {dohRestartRequired && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-amber-400">Изменение DoH требует перезапуска.</span>
+                    <button onClick={() => window.electronAPI?.relaunchApp?.()} className="text-[11px] px-2 py-1 rounded bg-sc-accent text-white font-bold">Перезапустить</button>
+                  </div>
+                )}
               </div>
 
               <div className="rounded-sc border border-sc-border bg-[#141414] p-4 space-y-4">
