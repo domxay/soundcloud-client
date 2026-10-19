@@ -1,26 +1,32 @@
-import { Search, Cloud, User, Minus, Square, X, Send, Palette, LogOut } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import {
+  Search,
+  Cloud,
+  User,
+  Minus,
+  Square,
+  X,
+  Send,
+  Sliders,
+  LogOut,
+  Upload,
+  Settings,
+} from 'lucide-react';
 import { authService } from '@/services/auth';
 
-const navTabs = ['Home', 'Stream', 'Library', 'Playlists', 'Likes', 'Downloads', 'Profile'];
-
 interface HeaderProps {
-  activeTab: string;
-  onTabChange: (tab: string) => void;
   onOpenLogin: () => void;
-  onOpenThemeSettings: () => void;
-  onSearch: (query: string) => void;
+  onOpenThemeSettings?: () => void;
 }
 
 export default function Header({
-  activeTab,
-  onTabChange,
   onOpenLogin,
   onOpenThemeSettings,
-  onSearch,
 }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
+  const navigate = useNavigate();
   const isAuth = authService.isAuthenticated();
   const session = authService.getSession();
 
@@ -34,17 +40,22 @@ export default function Header({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [dropdownOpen]);
+
   const username = session.user?.username || 'User';
   const avatar = session.user?.avatar_url;
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      onSearch(searchInput);
+    if (e.key === 'Enter' && searchInput.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchInput.trim())}`);
     }
   };
 
   const handleOpenTelegram = () => {
     window.open('https://t.me/codesand', '_blank');
+  };
+
+  const handleUploadClick = () => {
+    window.open('https://soundcloud.com/upload', '_blank');
   };
 
   const handleMinimize = () => {
@@ -67,73 +78,102 @@ export default function Header({
 
   const isElectron = Boolean((window as any).electronAPI);
 
+  const navLinks = [
+    { to: '/', label: 'Home' },
+    { to: '/feed', label: 'Feed' },
+    { to: '/library', label: 'Library' },
+  ];
+
   return (
     <header
-      className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-sc-border bg-sc-bg/90 px-4 select-none backdrop-blur-md"
+      className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-[#222222] bg-[#121212]/95 px-4 select-none backdrop-blur-md"
       style={{ WebkitAppRegion: 'drag' } as any}
     >
       <div
-        className="flex items-center gap-2.5 cursor-pointer shrink-0"
+        className="flex items-center gap-2 cursor-pointer shrink-0"
         style={{ WebkitAppRegion: 'no-drag' } as any}
-        onClick={() => onTabChange('Home')}
+        onClick={() => navigate('/')}
       >
-        <Cloud size={28} className="text-sc-accent" fill="currentColor" />
-        <span className="text-base font-bold tracking-tight text-white">SoundCloud</span>
+        <Cloud size={28} className="text-[#ff5500]" fill="currentColor" />
+        <span className="text-base font-bold tracking-tight text-white hidden sm:inline">
+          SoundCloud
+        </span>
       </div>
+
+      <nav
+        className="flex items-center gap-1 shrink-0 ml-1"
+        style={{ WebkitAppRegion: 'no-drag' } as any}
+      >
+        {navLinks.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.to === '/'}
+            className={({ isActive }) =>
+              `rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
+                isActive
+                  ? 'text-[#ff5500] border-b-2 border-[#ff5500]'
+                  : 'text-[#999999] hover:text-white'
+              }`
+            }
+          >
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
 
       <div
         className="relative flex-1 max-w-sm mx-2"
         style={{ WebkitAppRegion: 'no-drag' } as any}
       >
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-sc-text-secondary" />
+        <Search
+          size={14}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-[#777777]"
+        />
         <input
           type="text"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Search tracks, artists... (Press Enter)"
-          className="w-full rounded-sc border border-sc-border bg-sc-surface py-1.5 pl-9 pr-14 text-xs text-white placeholder:text-sc-text-secondary focus:border-sc-accent focus:outline-none transition-colors"
+          className="w-full rounded border border-[#2a2a2a] bg-[#1a1a1a] py-1.5 pl-8 pr-12 text-xs text-white placeholder:text-[#666666] focus:border-[#ff5500] focus:outline-none transition-colors"
         />
-        <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-sc border border-sc-border bg-sc-hover px-1 py-0.5 text-[9px] font-medium text-sc-text-secondary">
+        <kbd className="absolute right-2 top-1/2 -translate-y-1/2 rounded border border-[#333333] bg-[#242424] px-1 py-0.5 text-[9px] font-medium text-[#777777]">
           Enter
         </kbd>
       </div>
 
-      <nav
-        className="flex items-center gap-1"
-        style={{ WebkitAppRegion: 'no-drag' } as any}
-      >
-        {navTabs.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => onTabChange(tab)}
-            className={`rounded-sc px-2.5 py-1 text-xs font-medium transition-colors ${
-              activeTab === tab
-                ? 'text-sc-accent border-b-2 border-sc-accent font-semibold'
-                : 'text-sc-text-secondary hover:text-white'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </nav>
-
       <div
-        className="flex items-center gap-2 ml-auto"
+        className="flex items-center gap-2 ml-auto shrink-0"
         style={{ WebkitAppRegion: 'no-drag' } as any}
       >
         <button
-          onClick={onOpenThemeSettings}
-          className="flex items-center gap-1 rounded-sc border border-sc-border bg-sc-surface px-2.5 py-1 text-xs font-semibold text-white hover:border-sc-accent hover:text-sc-accent transition-all shadow-sm"
-          title="Themes & Network Studio"
+          onClick={handleUploadClick}
+          className="hidden md:flex items-center gap-1 text-xs font-medium text-[#999999] hover:text-white px-2 py-1 rounded transition-colors"
+          title="Upload to SoundCloud"
         >
-          <Palette size={13} className="text-sc-accent" />
-          <span>Themes</span>
+          <Upload size={14} />
+          <span>Upload</span>
+        </button>
+
+        <button
+          onClick={() => {
+            if (onOpenThemeSettings) {
+              onOpenThemeSettings();
+            } else {
+              navigate('/settings');
+            }
+          }}
+          className="flex items-center gap-1 rounded border border-[#282828] bg-[#1a1a1a] px-2.5 py-1 text-xs font-semibold text-white hover:border-[#ff5500] hover:text-[#ff5500] transition-all shadow-sm"
+          title="Studio Settings & Themes"
+        >
+          <Sliders size={13} className="text-[#ff5500]" />
+          <span className="hidden sm:inline">Settings</span>
         </button>
 
         <button
           onClick={handleOpenTelegram}
-          className="flex items-center gap-1.5 rounded-sc border border-[#229ED9]/40 bg-[#229ED9]/10 px-2.5 py-1 text-xs font-semibold text-[#229ED9] hover:bg-[#229ED9] hover:text-white transition-all shadow-sm"
+          className="hidden lg:flex items-center gap-1.5 rounded border border-[#229ED9]/40 bg-[#229ED9]/10 px-2.5 py-1 text-xs font-semibold text-[#229ED9] hover:bg-[#229ED9] hover:text-white transition-all shadow-sm"
           title="Author Telegram Channel"
         >
           <Send size={12} className="rotate-[-20deg]" />
@@ -144,20 +184,22 @@ export default function Header({
           <div className="relative">
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="flex items-center gap-2 rounded-sc border border-sc-border bg-sc-surface py-1 pl-1 pr-2.5 transition-colors hover:bg-sc-hover"
+              className="flex items-center gap-2 rounded border border-[#282828] bg-[#1a1a1a] py-1 pl-1 pr-2.5 transition-colors hover:bg-[#242424]"
             >
               {avatar ? (
                 <img
                   src={avatar}
                   alt={username}
-                  className="h-7 w-7 rounded-full object-cover border border-sc-border"
+                  className="h-6 w-6 rounded-full object-cover border border-[#333333]"
                 />
               ) : (
-                <div className="h-7 w-7 rounded-full bg-sc-hover border border-sc-border flex items-center justify-center text-white text-xs font-bold">
+                <div className="h-6 w-6 rounded-full bg-[#2a2a2a] border border-[#333333] flex items-center justify-center text-white text-xs font-bold">
                   {username.charAt(0).toUpperCase()}
                 </div>
               )}
-              <span className="text-xs font-medium max-w-[90px] truncate">{username}</span>
+              <span className="text-xs font-medium max-w-[80px] truncate">
+                {username}
+              </span>
             </button>
 
             {dropdownOpen && (
@@ -166,37 +208,38 @@ export default function Header({
                   className="fixed inset-0 z-40"
                   onClick={() => setDropdownOpen(false)}
                 />
-                <div className="absolute right-0 top-11 w-44 rounded-sc border border-sc-border bg-sc-surface py-1 shadow-2xl z-50">
+                <div className="absolute right-0 top-10 w-44 rounded border border-[#2a2a2a] bg-[#1c1c1c] py-1 shadow-2xl z-50">
                   <button
                     onClick={() => {
                       setDropdownOpen(false);
-                      onTabChange('Profile');
+                      navigate('/profile');
                     }}
-                    className="w-full px-3.5 py-2 text-left text-xs text-sc-text-secondary hover:bg-sc-hover hover:text-white flex items-center gap-2"
+                    className="w-full px-3.5 py-2 text-left text-xs text-[#cccccc] hover:bg-[#282828] hover:text-white flex items-center gap-2"
                   >
                     <User size={14} />
-                    View Profile
+                    Profile
                   </button>
                   <button
                     onClick={() => {
                       setDropdownOpen(false);
-                      onOpenThemeSettings();
+                      navigate('/settings');
                     }}
-                    className="w-full px-3.5 py-2 text-left text-xs text-sc-text-secondary hover:bg-sc-hover hover:text-white flex items-center gap-2"
+                    className="w-full px-3.5 py-2 text-left text-xs text-[#cccccc] hover:bg-[#282828] hover:text-white flex items-center gap-2"
                   >
-                    <Palette size={14} />
-                    Themes & Network
+                    <Settings size={14} />
+                    Settings
                   </button>
-                  <div className="my-1 border-t border-sc-border" />
+                  <div className="my-1 border-t border-[#2a2a2a]" />
                   <button
                     onClick={() => {
                       setDropdownOpen(false);
-                      onOpenLogin();
+                      authService.logout();
+                      window.location.reload();
                     }}
-                    className="w-full px-3.5 py-2 text-left text-xs text-red-400 hover:bg-sc-hover font-medium flex items-center gap-2"
+                    className="w-full px-3.5 py-2 text-left text-xs text-red-400 hover:bg-[#282828] font-medium flex items-center gap-2"
                   >
                     <LogOut size={14} />
-                    Account / Logout
+                    Sign Out
                   </button>
                 </div>
               </>
@@ -205,7 +248,7 @@ export default function Header({
         ) : (
           <button
             onClick={onOpenLogin}
-            className="rounded-sc bg-sc-accent px-4 py-1.5 text-xs font-bold text-white hover:bg-sc-accent-hover transition-colors shadow-sm"
+            className="rounded bg-[#ff5500] px-3.5 py-1.5 text-xs font-bold text-white hover:bg-[#ff6600] active:bg-[#e64d00] transition-colors shadow-sm"
           >
             Sign In
           </button>
@@ -214,24 +257,27 @@ export default function Header({
 
       {isElectron && (
         <div
-          className="flex items-center border-l border-sc-border pl-2 gap-1"
+          className="flex items-center border-l border-[#282828] pl-2 gap-0.5 shrink-0"
           style={{ WebkitAppRegion: 'no-drag' } as any}
         >
           <button
             onClick={handleMinimize}
-            className="flex h-7 w-8 items-center justify-center rounded-sc text-sc-text-secondary hover:bg-sc-hover hover:text-white transition-colors"
+            className="flex h-7 w-7 items-center justify-center rounded text-[#888888] hover:bg-[#222222] hover:text-white transition-colors"
+            title="Minimize"
           >
             <Minus size={13} />
           </button>
           <button
             onClick={handleMaximize}
-            className="flex h-7 w-8 items-center justify-center rounded-sc text-sc-text-secondary hover:bg-sc-hover hover:text-white transition-colors"
+            className="flex h-7 w-7 items-center justify-center rounded text-[#888888] hover:bg-[#222222] hover:text-white transition-colors"
+            title="Maximize"
           >
             <Square size={11} />
           </button>
           <button
             onClick={handleClose}
-            className="flex h-7 w-8 items-center justify-center rounded-sc text-sc-text-secondary hover:bg-red-600 hover:text-white transition-colors"
+            className="flex h-7 w-7 items-center justify-center rounded text-[#888888] hover:bg-[#e81123] hover:text-white transition-colors"
+            title="Close"
           >
             <X size={13} />
           </button>

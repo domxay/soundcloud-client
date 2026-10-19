@@ -78,6 +78,10 @@ export class AuthService {
     localStorage.removeItem(STORAGE_KEY);
   }
 
+  public logout(): void {
+    this.clearSession();
+  }
+
   public isAuthenticated(): boolean {
     return Boolean(this.session?.oauthToken && this.session.oauthToken.trim().length > 0);
   }

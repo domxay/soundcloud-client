@@ -1,21 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import './design-tokens.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-:root {
-  --sc-bg: #0e0507;
-  --sc-surface: #180a0e;
-  --sc-hover: #260f16;
-  --sc-border: #3d1622;
-  --sc-accent: #ff0055;
-  --sc-accent-hover: #ff2670;
-  --sc-text-primary: #ffffff;
-  --sc-text-secondary: #a87886;
-  --sc-wave-active: #ff0055;
-  --sc-wave-inactive: #3d1622;
-}
 
 html,
 body {

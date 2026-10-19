@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
+import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import HomeView from '@/components/HomeView';
 import PlaylistHero from '@/components/PlaylistHero';
 import TrackList from '@/components/TrackList';
-import PlayerBar from '@/components/PlayerBar';
+import { MiniPlayer } from '@/components/MiniPlayer';
+import { QueuePanel } from '@/components/QueuePanel';
 import LoginModal from '@/components/LoginModal';
 import DownloadsView from '@/components/DownloadsView';
 import ProfileView from '@/components/ProfileView';
@@ -12,6 +14,7 @@ import PlaylistsView from '@/components/PlaylistsView';
 import CommentsModal from '@/components/CommentsModal';
 import LyricsModal from '@/components/LyricsModal';
 import ThemeSettingsModal from '@/components/ThemeSettingsModal';
+import { FeedView, SearchResultsView, SettingsView, TrackPageView } from '@/views';
 import { Track, Playlist, DownloadItem, UserProfile, Comment, ToastNotification } from '@/types';
 import { emptyPlaylist } from '@/data';
 import { audioService } from '@/services/audio';
@@ -19,10 +22,11 @@ import { soundcloudApi } from '@/services/api';
 import { downloaderService } from '@/services/downloader';
 import { authService } from '@/services/auth';
 import { themeService, CustomBackground } from '@/services/theme';
-import { Cloud, LogIn, CheckCircle2, Info, AlertCircle } from 'lucide-react';
+import { queueService } from '@/services/queue';
+import { CheckCircle2, Info, AlertCircle } from 'lucide-react';
 
-function App() {
-  const [activeTab, setActiveTab] = useState('Home');
+function AppContent() {
+  const navigate = useNavigate();
   const [currentPlaylist, setCurrentPlaylist] = useState<Playlist>(emptyPlaylist);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
@@ -32,7 +36,7 @@ function App() {
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(75);
   const [shuffle, setShuffle] = useState(false);
-  const [repeat, setRepeat] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<'off' | 'one' | 'all'>('off');
   const [playlistLiked, setPlaylistLiked] = useState(false);
   const [downloadingIds, setDownloadingIds] = useState<Set<number>>(new Set());
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
@@ -45,6 +49,7 @@ function App() {
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isLyricsOpen, setIsLyricsOpen] = useState(false);
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
+  const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [customBg, setCustomBg] = useState<CustomBackground>(themeService.getBackground());
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
 
@@ -56,36 +61,27 @@ function App() {
     }, 3500);
   };
 
-  const currentIndex = currentTrack
-    ? tracks.findIndex((t) => t.id === currentTrack.id)
-    : 0;
-
   const handleNext = useCallback(() => {
-    if (tracks.length === 0) return;
-    let nextIndex = 0;
-    if (shuffle) {
-      nextIndex = Math.floor(Math.random() * tracks.length);
-    } else {
-      nextIndex = (currentIndex + 1) % tracks.length;
+    const nextTrack = queueService.next();
+    if (nextTrack) {
+      setCurrentTrack(nextTrack);
+      setDuration(nextTrack.duration);
+      audioService.playTrack(nextTrack);
     }
-    const nextTrack = tracks[nextIndex];
-    setCurrentTrack(nextTrack);
-    setDuration(nextTrack.duration);
-    audioService.playTrack(nextTrack);
-  }, [shuffle, currentIndex, tracks]);
+  }, []);
 
   const handlePrev = useCallback(() => {
-    if (tracks.length === 0) return;
     if (currentTime > 3) {
       audioService.seek(0);
       return;
     }
-    const prevIndex = (currentIndex - 1 + tracks.length) % tracks.length;
-    const prevTrack = tracks[prevIndex];
-    setCurrentTrack(prevTrack);
-    setDuration(prevTrack.duration);
-    audioService.playTrack(prevTrack);
-  }, [currentIndex, tracks, currentTime]);
+    const prevTrack = queueService.prev();
+    if (prevTrack) {
+      setCurrentTrack(prevTrack);
+      setDuration(prevTrack.duration);
+      audioService.playTrack(prevTrack);
+    }
+  }, [currentTime]);
 
   useEffect(() => {
     const unsubAudio = audioService.subscribe((state) => {
@@ -122,12 +118,12 @@ function App() {
 
     const initProxy = async () => {
       const savedProxy = localStorage.getItem('sc_proxy_rule');
-      if (savedProxy && window.electronAPI?.setProxy) {
-        await window.electronAPI.setProxy(savedProxy);
-      } else if (window.electronAPI?.detectLocalProxy) {
-        const detected = await window.electronAPI.detectLocalProxy();
+      if (savedProxy && (window as any).electronAPI?.setProxy) {
+        await (window as any).electronAPI.setProxy(savedProxy);
+      } else if ((window as any).electronAPI?.detectLocalProxy) {
+        const detected = await (window as any).electronAPI.detectLocalProxy();
         if (detected.success && detected.proxy) {
-          await window.electronAPI.setProxy(detected.proxy);
+          await (window as any).electronAPI.setProxy(detected.proxy);
           localStorage.setItem('sc_proxy_rule', detected.proxy);
         }
       }
@@ -156,8 +152,8 @@ function App() {
     audioService.setOnEnded(() => {
       handleNext();
     });
-    audioService.setRepeat(repeat);
-  }, [handleNext, repeat]);
+    audioService.setRepeat(repeatMode === 'one');
+  }, [handleNext, repeatMode]);
 
   const loadUserData = useCallback(async () => {
     if (!authService.isAuthenticated()) {
@@ -172,43 +168,7 @@ function App() {
         setCurrentUser(user);
         authService.setUser(user);
       }
-
-      const history = await soundcloudApi.getUserPlayHistory();
-      if (history.length > 0) {
-        setTracks(history);
-        setCurrentTrack(history[0]);
-        setDuration(history[0].duration);
-        setCurrentPlaylist({
-          id: 1,
-          title: 'Recently Played Stream',
-          artist: user?.username || 'Me',
-          artwork: history[0]?.artwork || emptyPlaylist.artwork,
-          updatedDaysAgo: 0,
-          tracks: history,
-        });
-      } else {
-        const trending = await soundcloudApi.getTrendingTracks();
-        if (trending.length > 0) {
-          setTracks(trending);
-          setCurrentTrack(trending[0]);
-          setDuration(trending[0].duration);
-          setCurrentPlaylist({
-            id: 3,
-            title: 'Discover SoundCloud Top Stream',
-            artist: 'SoundCloud Curated',
-            artwork: trending[0]?.artwork || emptyPlaylist.artwork,
-            updatedDaysAgo: 0,
-            tracks: trending,
-          });
-        }
-      }
     } catch {
-      const fallback = await soundcloudApi.getTrendingTracks();
-      if (fallback.length > 0) {
-        setTracks(fallback);
-        setCurrentTrack(fallback[0]);
-        setDuration(fallback[0].duration);
-      }
     } finally {
       setLoading(false);
     }
@@ -218,96 +178,14 @@ function App() {
     loadUserData();
   }, [loadUserData]);
 
-  useEffect(() => {
-    const refreshStream = async () => {
-      if (activeTab !== 'Stream') return;
-      try {
-        let streamTracks: Track[] = [];
-        if (authService.isAuthenticated()) {
-          streamTracks = await soundcloudApi.getUserPlayHistory();
-        }
-        if (streamTracks.length === 0) {
-          streamTracks = await soundcloudApi.getTrendingTracks();
-        }
-        if (streamTracks.length === 0) return;
-        setTracks((prev) => {
-          const ids = new Set(prev.map((t) => t.id));
-          const newOnes = streamTracks.filter((t) => !ids.has(t.id));
-          const updated = prev.map((t) => {
-            const inc = streamTracks.find((h) => h.id === t.id);
-            return inc ? { ...t, ...inc, liked: t.liked || inc.liked } : t;
-          });
-          const merged = [...newOnes, ...updated].slice(0, Math.max(prev.length, streamTracks.length));
-          setCurrentPlaylist((p) => ({ ...p, tracks: merged }));
-          return merged;
-        });
-      } catch {}
-    };
-
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') refreshStream();
-    }, 60000);
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') refreshStream();
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, [activeTab]);
-
-  const handleTabChange = async (tab: string) => {
-    setActiveTab(tab);
-    if (tab === 'Home' || tab === 'Profile' || tab === 'Downloads' || tab === 'Library' || tab === 'Playlists') {
-      return;
-    }
-
-    setLoading(true);
-    try {
-      if (tab === 'Likes') {
-        const likes = await soundcloudApi.getUserLikes();
-        if (likes.length > 0) {
-          setTracks(likes);
-          setCurrentPlaylist({
-            id: 999,
-            title: 'My Liked Tracks',
-            artist: authService.getSession().user?.username || 'Guest',
-            artwork: likes[0]?.artwork || emptyPlaylist.artwork,
-            updatedDaysAgo: 0,
-            tracks: likes,
-          });
-        } else {
-          const trending = await soundcloudApi.getTrendingTracks();
-          setTracks(trending);
-          setCurrentPlaylist({
-            id: 999,
-            title: 'Liked Tracks (Empty - Discover Below)',
-            artist: 'SoundCloud',
-            artwork: trending[0]?.artwork || emptyPlaylist.artwork,
-            updatedDaysAgo: 0,
-            tracks: trending,
-          });
-        }
-      } else if (tab === 'Stream') {
-        let streamTracks = await soundcloudApi.getUserPlayHistory();
-        if (streamTracks.length === 0) {
-          streamTracks = await soundcloudApi.getTrendingTracks();
-        }
-        if (streamTracks.length > 0) {
-          setTracks(streamTracks);
-          setCurrentPlaylist({
-            id: 1,
-            title: authService.isAuthenticated() ? 'Personal Stream' : 'Live Global Stream',
-            artist: authService.getSession().user?.username || 'SoundCloud Live',
-            artwork: streamTracks[0]?.artwork || emptyPlaylist.artwork,
-            updatedDaysAgo: 0,
-            tracks: streamTracks,
-          });
-        }
-      }
-    } finally {
-      setLoading(false);
+  const handleTrackPlay = (track: Track, list?: Track[]) => {
+    if (currentTrack?.id === track.id) {
+      audioService.togglePlay();
+    } else {
+      queueService.play(track, list && list.length > 0 ? list : tracks);
+      setCurrentTrack(track);
+      setDuration(track.duration);
+      audioService.playTrack(track);
     }
   };
 
@@ -315,54 +193,12 @@ function App() {
     setCurrentPlaylist(p);
     setTracks(p.tracks);
     if (p.tracks.length > 0) {
+      queueService.play(p.tracks[0], p.tracks);
       setCurrentTrack(p.tracks[0]);
       setDuration(p.tracks[0].duration);
       audioService.playTrack(p.tracks[0]);
     }
-    setActiveTab('Stream');
     addToast(`Playing playlist: ${p.title}`, 'info');
-  };
-
-  const handleSearch = async (query: string) => {
-    if (!query.trim()) return;
-    setLoading(true);
-    try {
-      const results = await soundcloudApi.searchTracks(query);
-      if (results.length > 0) {
-        setTracks(results);
-        setCurrentPlaylist({
-          id: 888,
-          title: `Search: "${query}"`,
-          artist: 'SoundCloud',
-          artwork: results[0]?.artwork || emptyPlaylist.artwork,
-          updatedDaysAgo: 0,
-          tracks: results,
-        });
-        setActiveTab('Stream');
-        addToast(`Found ${results.length} tracks for "${query}"`, 'info');
-      } else {
-        addToast(`No results found for "${query}"`, 'warning');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleTrackPlay = (track: Track) => {
-    if (currentTrack?.id === track.id) {
-      audioService.togglePlay();
-    } else {
-      setCurrentTrack(track);
-      setDuration(track.duration);
-      audioService.playTrack(track);
-    }
-  };
-
-  const handlePlayAll = () => {
-    if (tracks.length === 0) return;
-    setCurrentTrack(tracks[0]);
-    setDuration(tracks[0].duration);
-    audioService.playTrack(tracks[0]);
   };
 
   const handleLikeToggle = (id: number) => {
@@ -378,6 +214,14 @@ function App() {
       downloaderService.downloadTrack(track);
       addToast(`Choose destination to save: ${track.title}`, 'info');
     }
+  };
+
+  const handlePlayAll = () => {
+    if (tracks.length === 0) return;
+    queueService.play(tracks[0], tracks);
+    setCurrentTrack(tracks[0]);
+    setDuration(tracks[0].duration);
+    audioService.playTrack(tracks[0]);
   };
 
   const handleDownloadAll = async () => {
@@ -404,12 +248,23 @@ function App() {
     }
   };
 
+  const handleCycleRepeat = () => {
+    const next = queueService.cycleRepeat();
+    setRepeatMode(next);
+  };
+
+  const handleToggleShuffle = () => {
+    const next = !shuffle;
+    setShuffle(next);
+    queueService.setShuffle(next);
+  };
+
   const isPlayerDownloading = currentTrack
     ? downloadingIds.has(currentTrack.id)
     : false;
 
   return (
-    <div className="min-h-screen bg-sc-bg text-sc-text-primary flex flex-col relative">
+    <div className="min-h-screen bg-[#121212] text-white flex flex-col relative pb-20">
       {customBg.type !== 'none' && customBg.url && (
         <div className="sc-bg-layer">
           {customBg.type === 'video' ? (
@@ -438,94 +293,156 @@ function App() {
       )}
 
       <Header
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
         onOpenLogin={() => setIsLoginModalOpen(true)}
         onOpenThemeSettings={() => setIsThemeModalOpen(true)}
-        onSearch={handleSearch}
       />
 
       <main className="mx-auto max-w-[1400px] w-full flex-1 relative z-10 flex flex-col">
-        {activeTab === 'Home' ? (
-          <HomeView
-            currentTrackId={currentTrack?.id ?? null}
-            isPlaying={isPlaying}
-            downloadingIds={downloadingIds}
-            onTrackPlay={handleTrackPlay}
-            onLikeToggle={handleLikeToggle}
-            onDownload={handleDownload}
-            onSelectPlaylist={handleSelectPlaylist}
-            onOpenComments={handleOpenCommentsModal}
-            onNavigateTab={handleTabChange}
-          />
-        ) : activeTab === 'Playlists' ? (
-          <PlaylistsView
-            currentTrackId={currentTrack?.id ?? null}
-            isPlaying={isPlaying}
-            downloadingIds={downloadingIds}
-            onTrackPlay={handleTrackPlay}
-            onLikeToggle={handleLikeToggle}
-            onDownload={handleDownload}
-            onSelectPlaylist={handleSelectPlaylist}
-            onOpenComments={handleOpenCommentsModal}
-          />
-        ) : activeTab === 'Library' ? (
-          <LibraryView
-            currentTrackId={currentTrack?.id ?? null}
-            isPlaying={isPlaying}
-            downloadingIds={downloadingIds}
-            onTrackPlay={handleTrackPlay}
-            onLikeToggle={handleLikeToggle}
-            onDownload={handleDownload}
-            onSelectPlaylist={handleSelectPlaylist}
-            onOpenComments={handleOpenCommentsModal}
-          />
-        ) : activeTab === 'Profile' ? (
-          <ProfileView
-            user={currentUser}
-            currentTrackId={currentTrack?.id ?? null}
-            isPlaying={isPlaying}
-            downloadingIds={downloadingIds}
-            onTrackPlay={handleTrackPlay}
-            onLikeToggle={handleLikeToggle}
-            onDownload={handleDownload}
-            onOpenLogin={() => setIsLoginModalOpen(true)}
-          />
-        ) : activeTab === 'Downloads' ? (
-          <DownloadsView downloads={downloads} />
-        ) : (
-          <>
-            <PlaylistHero
-              playlist={currentPlaylist}
-              onPlayAll={handlePlayAll}
-              onDownloadAll={handleDownloadAll}
-              downloadingAll={isDownloadingAll}
-              liked={playlistLiked}
-              onLike={() => setPlaylistLiked(!playlistLiked)}
-            />
-
-            {loading ? (
-              <div className="text-center py-20 text-sc-text-secondary">
-                Loading SoundCloud stream...
-              </div>
-            ) : (
-              <TrackList
-                tracks={tracks}
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <HomeView
                 currentTrackId={currentTrack?.id ?? null}
                 isPlaying={isPlaying}
-                onTrackPlay={handleTrackPlay}
-                onLikeToggle={handleLikeToggle}
                 downloadingIds={downloadingIds}
+                onTrackPlay={(t) => handleTrackPlay(t)}
+                onLikeToggle={handleLikeToggle}
                 onDownload={handleDownload}
+                onSelectPlaylist={handleSelectPlaylist}
+                onOpenComments={handleOpenCommentsModal}
+                onNavigateTab={(tab) => {
+                  if (tab === 'Playlists') navigate('/playlists');
+                  else if (tab === 'Library') navigate('/library');
+                  else if (tab === 'Stream') navigate('/feed');
+                }}
+              />
+            }
+          />
+          <Route
+            path="/feed"
+            element={
+              <FeedView
+                onPlayTrack={(t, l) => handleTrackPlay(t, l)}
+                currentTrack={currentTrack}
+                isPlaying={isPlaying}
+                onLikeTrack={(t) => handleLikeToggle(t.id)}
+                onOpenLogin={() => setIsLoginModalOpen(true)}
+              />
+            }
+          />
+          <Route
+            path="/library"
+            element={
+              <LibraryView
+                currentTrackId={currentTrack?.id ?? null}
+                isPlaying={isPlaying}
+                downloadingIds={downloadingIds}
+                onTrackPlay={(t) => handleTrackPlay(t)}
+                onLikeToggle={handleLikeToggle}
+                onDownload={handleDownload}
+                onSelectPlaylist={handleSelectPlaylist}
                 onOpenComments={handleOpenCommentsModal}
               />
-            )}
-          </>
-        )}
+            }
+          />
+          <Route
+            path="/playlists"
+            element={
+              <PlaylistsView
+                currentTrackId={currentTrack?.id ?? null}
+                isPlaying={isPlaying}
+                downloadingIds={downloadingIds}
+                onTrackPlay={(t) => handleTrackPlay(t)}
+                onLikeToggle={handleLikeToggle}
+                onDownload={handleDownload}
+                onSelectPlaylist={handleSelectPlaylist}
+                onOpenComments={handleOpenCommentsModal}
+              />
+            }
+          />
+          <Route
+            path="/search"
+            element={
+              <SearchResultsView
+                onPlayTrack={(t, l) => handleTrackPlay(t, l)}
+                currentTrack={currentTrack}
+                isPlaying={isPlaying}
+                onLikeTrack={(t) => handleLikeToggle(t.id)}
+              />
+            }
+          />
+          <Route
+            path="/tracks/:id"
+            element={
+              <TrackPageView
+                onPlayTrack={(t, l) => handleTrackPlay(t, l)}
+                currentTrack={currentTrack}
+                isPlaying={isPlaying}
+                onLikeTrack={(t) => handleLikeToggle(t.id)}
+                onDownloadTrack={(t) => handleDownload(t.id)}
+              />
+            }
+          />
+          <Route
+            path="/settings"
+            element={<SettingsView onOpenLogin={() => setIsLoginModalOpen(true)} />}
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProfileView
+                user={currentUser}
+                currentTrackId={currentTrack?.id ?? null}
+                isPlaying={isPlaying}
+                downloadingIds={downloadingIds}
+                onTrackPlay={(t) => handleTrackPlay(t)}
+                onLikeToggle={handleLikeToggle}
+                onDownload={handleDownload}
+                onOpenLogin={() => setIsLoginModalOpen(true)}
+              />
+            }
+          />
+          <Route
+            path="/downloads"
+            element={<DownloadsView downloads={downloads} />}
+          />
+          <Route
+            path="/stream"
+            element={
+              <>
+                <PlaylistHero
+                  playlist={currentPlaylist}
+                  onPlayAll={handlePlayAll}
+                  onDownloadAll={handleDownloadAll}
+                  downloadingAll={isDownloadingAll}
+                  liked={playlistLiked}
+                  onLike={() => setPlaylistLiked(!playlistLiked)}
+                />
+                {loading ? (
+                  <div className="text-center py-20 text-[#888888]">
+                    Loading SoundCloud stream...
+                  </div>
+                ) : (
+                  <TrackList
+                    tracks={tracks}
+                    currentTrackId={currentTrack?.id ?? null}
+                    isPlaying={isPlaying}
+                    onTrackPlay={(t) => handleTrackPlay(t)}
+                    onLikeToggle={handleLikeToggle}
+                    downloadingIds={downloadingIds}
+                    onDownload={handleDownload}
+                    onOpenComments={handleOpenCommentsModal}
+                  />
+                )}
+              </>
+            }
+          />
+        </Routes>
       </main>
 
       {currentTrack && (
-        <PlayerBar
+        <MiniPlayer
           track={currentTrack}
           isPlaying={isPlaying}
           progress={progress}
@@ -533,24 +450,34 @@ function App() {
           duration={duration}
           volume={volume}
           shuffle={shuffle}
-          repeat={repeat}
+          repeatMode={repeatMode}
           liked={currentTrack?.liked ?? false}
           downloading={isPlayerDownloading}
+          queueCount={queueService.getState().items.length}
+          isQueueOpen={isQueueOpen}
           comments={currentTrackComments}
           onPlayPause={() => audioService.togglePlay()}
           onPrev={handlePrev}
           onNext={handleNext}
           onSeek={handleSeek}
           onVolume={handleVolumeChange}
-          onShuffle={() => setShuffle(!shuffle)}
-          onRepeat={() => setRepeat(!repeat)}
+          onShuffle={handleToggleShuffle}
+          onRepeat={handleCycleRepeat}
           onLike={() => currentTrack && handleLikeToggle(currentTrack.id)}
           onDownload={() => currentTrack && handleDownload(currentTrack.id)}
-          onOpenDownloads={() => setActiveTab('Downloads')}
+          onToggleQueue={() => setIsQueueOpen(!isQueueOpen)}
           onOpenComments={() => handleOpenCommentsModal()}
           onOpenLyrics={() => setIsLyricsOpen(true)}
+          onTrackTitleClick={() => navigate(`/tracks/${currentTrack.id}`)}
+          onArtistClick={(artist) => navigate(`/search?q=${encodeURIComponent(artist)}`)}
         />
       )}
+
+      <QueuePanel
+        isOpen={isQueueOpen}
+        onClose={() => setIsQueueOpen(false)}
+        onPlayTrack={(t) => handleTrackPlay(t)}
+      />
 
       <LoginModal
         isOpen={isLoginModalOpen}
@@ -591,20 +518,28 @@ function App() {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className="flex items-center gap-2.5 rounded-sc bg-[#1e1e1e]/95 border border-sc-border px-4 py-2.5 shadow-2xl backdrop-blur-md text-xs font-semibold text-white pointer-events-auto animate-in slide-in-from-right-4 duration-200"
+            className="flex items-center gap-2.5 rounded bg-[#1e1e1e]/95 border border-[#333333] px-4 py-2.5 shadow-2xl backdrop-blur-md text-xs font-semibold text-white pointer-events-auto animate-in slide-in-from-right-4 duration-200"
           >
             {t.type === 'success' ? (
               <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
             ) : t.type === 'warning' ? (
               <AlertCircle size={16} className="text-amber-400 shrink-0" />
             ) : (
-              <Info size={16} className="text-sc-accent shrink-0" />
+              <Info size={16} className="text-[#ff5500] shrink-0" />
             )}
             <span className="truncate max-w-xs">{t.message}</span>
           </div>
         ))}
       </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <HashRouter>
+      <AppContent />
+    </HashRouter>
   );
 }
 

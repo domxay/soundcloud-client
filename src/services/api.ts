@@ -151,10 +151,10 @@ export class SoundCloudApi {
     }
   }
 
-  public async searchTracks(query: string): Promise<Track[]> {
+  public async searchTracks(query: string, limit: number = 35): Promise<Track[]> {
     if (!query.trim()) return [];
     try {
-      const res = await fetch(this.buildUrl('/search/tracks', { q: query, limit: 35 }), {
+      const res = await fetch(this.buildUrl('/search/tracks', { q: query, limit }), {
         headers: this.getHeaders(),
       });
       if (!res.ok) return [];
@@ -172,6 +172,31 @@ export class SoundCloudApi {
       return tracks;
     } catch {
       return [];
+    }
+  }
+
+  public async getStream(limit: number = 40): Promise<Track[]> {
+    return this.getUserPlayHistory();
+  }
+
+  public async getTrending(limit: number = 50): Promise<Track[]> {
+    return this.getTopCharts();
+  }
+
+  public async fetchTrack(id: number): Promise<Track | null> {
+    const existing = this.getTrack(id);
+    if (existing) return existing;
+    try {
+      const res = await fetch(this.buildUrl(`/tracks/${id}`), {
+        headers: this.getHeaders(),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const t = this.mapRawTrack(data);
+      this.registerTrack(t);
+      return t;
+    } catch {
+      return null;
     }
   }
 
