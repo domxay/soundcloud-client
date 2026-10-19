@@ -176,11 +176,14 @@ function stopBuiltinProxy() {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
+    title: 'SoundCloud Desktop',
     width: 1300,
     height: 870,
     minWidth: 1024,
     minHeight: 700,
     frame: false,
+    show: true,
+    center: true,
     backgroundColor: '#121212',
     icon: path.join(__dirname, '../resources/icon.png'),
     webPreferences: {
@@ -189,6 +192,11 @@ function createWindow() {
       contextIsolation: true,
       webSecurity: false,
     },
+  });
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    mainWindow.focus();
   });
 
   const distPath = path.join(__dirname, '../dist/index.html');
@@ -552,6 +560,7 @@ ipcMain.handle('sc:builtin-proxy-status', () => ({ running: !!builtinProxyServer
 ipcMain.handle('sc:relaunch-app', () => { app.relaunch(); app.quit(); return { success: true }; });
 
 app.whenReady().then(async () => {
+  createWindow();
   const ns = loadNetworkSettings();
   if (ns.builtinProxyEnabled) {
     const res = await startBuiltinProxy(ns.builtinProxyPort || 8899);
@@ -571,12 +580,11 @@ app.whenReady().then(async () => {
       }
     }
   }
-  if (currentProxyRule && session.defaultSession) {
-    try {
-      await session.defaultSession.setProxy({ proxyRules: currentProxyRule });
-    } catch {}
+  if (currentProxyRule) {
+    const cfg = { proxyRules: currentProxyRule };
+    try { if (session.defaultSession) await session.defaultSession.setProxy(cfg); } catch {}
+    try { if (mainWindow && mainWindow.webContents.session) await mainWindow.webContents.session.setProxy(cfg); } catch {}
   }
-  createWindow();
 });
 
 app.on('window-all-closed', () => {
