@@ -9,8 +9,45 @@ export class SoundCloudApi {
   private trackRegistry: Map<number, Track> = new Map();
   private streamUrlCache: Map<number, { url: string; ts: number }> = new Map();
   private likeListeners: Set<(trackId: number, isLiked: boolean) => void> = new Set();
+  private responseCache: Map<string, { data: any; expiresAt: number }> = new Map();
 
   private constructor() {}
+
+  private getCachedData<T>(key: string): T | null {
+    const item = this.responseCache.get(key);
+    if (!item) return null;
+    if (Date.now() > item.expiresAt) {
+      this.responseCache.delete(key);
+      return null;
+    }
+    return item.data as T;
+  }
+
+  private setCachedData<T>(key: string, data: T, ttlMs: number = 300000): void {
+    this.responseCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+  }
+
+  private async fetchWithRetry(url: string, init?: RequestInit, retries: number = 3): Promise<Response> {
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const res = await fetch(url, {
+          ...init,
+          signal: controller.signal,
+          headers: { ...this.getHeaders(), ...(init?.headers || {}) },
+        });
+        clearTimeout(timeoutId);
+        if (res.ok || res.status === 404 || res.status === 401) {
+          return res;
+        }
+      } catch (err: any) {
+        if (attempt === retries - 1) throw err;
+      }
+      await new Promise((r) => setTimeout(r, 350 * (attempt + 1)));
+    }
+    return fetch(url, { headers: this.getHeaders() });
+  }
 
   private daysAgo(date?: string): number {
     if (!date) return 1;
@@ -152,11 +189,15 @@ export class SoundCloudApi {
   }
 
   public async searchTracks(query: string, limit: number = 35): Promise<Track[]> {
-    if (!query.trim()) return [];
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+
+    const cacheKey = `search_${trimmed.toLowerCase()}_${limit}`;
+    const cached = this.getCachedData<Track[]>(cacheKey);
+    if (cached && cached.length > 0) return cached;
+
     try {
-      const res = await fetch(this.buildUrl('/search/tracks', { q: query, limit }), {
-        headers: this.getHeaders(),
-      });
+      const res = await this.fetchWithRetry(this.buildUrl('/search/tracks', { q: trimmed, limit }));
       if (!res.ok) return [];
       const data = await res.json();
       const collection = data.collection || [];
@@ -169,6 +210,9 @@ export class SoundCloudApi {
         this.registerTrack(t);
         return t;
       });
+      if (tracks.length > 0) {
+        this.setCachedData(cacheKey, tracks, 180000);
+      }
       return tracks;
     } catch {
       return [];
@@ -430,12 +474,13 @@ export class SoundCloudApi {
   }
 
   public async getFeaturedPlaylists(): Promise<Playlist[]> {
+    const cached = this.getCachedData<Playlist[]>('featured_playlists');
+    if (cached && cached.length > 0) return cached;
+
     const playlists: Playlist[] = [];
 
     try {
-      const res = await fetch(this.buildUrl('/mixed-selections', { limit: 10 }), {
-        headers: this.getHeaders(),
-      });
+      const res = await this.fetchWithRetry(this.buildUrl('/mixed-selections', { limit: 10 }));
       if (res.ok) {
         const data = await res.json();
         for (const section of data.collection || []) {
@@ -491,6 +536,10 @@ export class SoundCloudApi {
       }
     }
 
+    if (playlists.length > 0) {
+      this.setCachedData('featured_playlists', playlists, 300000);
+    }
+
     return playlists;
   }
 
@@ -499,23 +548,26 @@ export class SoundCloudApi {
   }
 
   public async getTopCharts(): Promise<Track[]> {
+    const cached = this.getCachedData<Track[]>('top_charts_50');
+    if (cached && cached.length > 0) return cached;
+
     try {
-      const res = await fetch(this.buildUrl('/charts', { kind: 'trending', limit: 50 }), {
-        headers: this.getHeaders(),
-      });
+      const res = await this.fetchWithRetry(this.buildUrl('/charts', { kind: 'trending', limit: 50 }));
       if (res.ok) {
         const data = await res.json();
         const collection = data.collection || [];
         if (collection.length > 0) {
           const localLikes = this.getLocalLikes();
           const likedSet = new Set(localLikes.map((t) => t.id));
-          return collection.map((item: any) => {
+          const tracks = collection.map((item: any) => {
             const raw = item.track || item;
             const t = this.mapRawTrack(raw);
             if (likedSet.has(t.id)) t.liked = true;
             this.registerTrack(t);
             return t;
           });
+          this.setCachedData('top_charts_50', tracks, 300000);
+          return tracks;
         }
       }
     } catch {}
@@ -562,23 +614,29 @@ export class SoundCloudApi {
   }
 
   public async getGenreTracks(genre: string): Promise<Track[]> {
+    const cacheKey = `genre_${genre}`;
+    const cached = this.getCachedData<Track[]>(cacheKey);
+    if (cached && cached.length > 0) return cached;
+
     try {
       const q = genre === 'All' ? 'Trending Hits 2026' : `${genre} 2026`;
-      const res = await fetch(this.buildUrl('/search/tracks', { q, limit: 30 }), {
-        headers: this.getHeaders(),
-      });
+      const res = await this.fetchWithRetry(this.buildUrl('/search/tracks', { q, limit: 30 }));
       if (!res.ok) return [];
       const data = await res.json();
       const collection = data.collection || [];
       const localLikes = this.getLocalLikes();
       const likedSet = new Set(localLikes.map((t) => t.id));
 
-      return collection.map((raw: any) => {
+      const tracks = collection.map((raw: any) => {
         const t = this.mapRawTrack(raw);
         if (likedSet.has(t.id)) t.liked = true;
         this.registerTrack(t);
         return t;
       });
+      if (tracks.length > 0) {
+        this.setCachedData(cacheKey, tracks, 300000);
+      }
+      return tracks;
     } catch {
       return [];
     }

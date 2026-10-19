@@ -57,6 +57,17 @@ export class AudioService {
         this.onEndedCallback();
       }
     });
+
+    this.audio.addEventListener('error', () => {
+      if (this.currentTrack && !this.hls) {
+        soundcloudApi.getTrackStreamUrl(this.currentTrack).then((url) => {
+          if (url && url !== this.audio.src) {
+            this.audio.src = url;
+            this.audio.play().catch(() => {});
+          }
+        }).catch(() => {});
+      }
+    });
   }
 
   private notify(): void {
@@ -117,8 +128,33 @@ export class AudioService {
     if (streamUrl.includes('.m3u8') && Hls.isSupported()) {
       this.hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: true,
+        lowLatencyMode: false,
+        maxBufferLength: 45,
+        maxMaxBufferLength: 90,
+        maxBufferSize: 60 * 1000 * 1000,
+        manifestLoadingTimeOut: 10000,
+        manifestLoadingMaxRetry: 4,
+        fragLoadingTimeOut: 15000,
+        fragLoadingMaxRetry: 5,
       });
+
+      this.hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) {
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              this.hls?.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              this.hls?.recoverMediaError();
+              break;
+            default:
+              this.hls?.destroy();
+              this.hls = null;
+              break;
+          }
+        }
+      });
+
       this.hls.loadSource(streamUrl);
       this.hls.attachMedia(this.audio);
       this.hls.on(Hls.Events.MANIFEST_PARSED, () => {

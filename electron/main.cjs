@@ -49,12 +49,18 @@ function getDownloadsPath() {
 
 async function fetchBuffer(url) {
   if (net && typeof net.fetch === 'function') {
-    const res = await net.fetch(url, { headers: DEFAULT_HEADERS });
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
+    try {
+      const res = await net.fetch(url, { headers: DEFAULT_HEADERS, signal: controller.signal });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      const ab = await res.arrayBuffer();
+      return Buffer.from(ab);
+    } finally {
+      clearTimeout(timer);
     }
-    const ab = await res.arrayBuffer();
-    return Buffer.from(ab);
   }
   return new Promise((resolve, reject) => {
     const client = url.startsWith('https') ? https : http;
@@ -69,6 +75,9 @@ async function fetchBuffer(url) {
       res.on('data', (d) => chunks.push(d));
       res.on('end', () => resolve(Buffer.concat(chunks)));
       res.on('error', reject);
+    });
+    req.setTimeout(12000, () => {
+      req.destroy(new Error('Network request timed out'));
     });
     req.on('error', reject);
   });
@@ -463,16 +472,22 @@ p { font-size: 13px; color: #aaa; line-height: 1.6; max-width: 420px; margin: 8p
 ipcMain.handle('sc:download-track', async (event, trackData) => {
   try {
     const { title, artist, streamUrl, destinationPath, destinationFolder } = trackData;
-    const sanitizedTitle = `${artist} - ${title}`.replace(/[\\/:*?"<>|]/g, '_').trim();
-    const isHls = streamUrl.includes('.m3u8');
+    const cleanArtist = String(artist || 'Artist').replace(/[\\/:*?"<>|\r\n\t]/g, '_').slice(0, 80).trim();
+    const cleanTitle = String(title || 'Track').replace(/[\\/:*?"<>|\r\n\t]/g, '_').slice(0, 100).trim();
+    const sanitizedTitle = `${cleanArtist} - ${cleanTitle}`;
+    const isHls = Boolean(streamUrl && streamUrl.includes('.m3u8'));
     const ext = isHls ? 'm4a' : 'mp3';
 
-    let targetFile = destinationPath;
+    let targetFile = destinationPath ? path.resolve(destinationPath) : null;
     if (!targetFile && destinationFolder) {
-      targetFile = path.join(destinationFolder, `${sanitizedTitle}.${ext}`);
+      targetFile = path.resolve(destinationFolder, `${sanitizedTitle}.${ext}`);
     }
     if (!targetFile) {
-      targetFile = path.join(getDownloadsPath(), `${sanitizedTitle}.${ext}`);
+      targetFile = path.resolve(getDownloadsPath(), `${sanitizedTitle}.${ext}`);
+    }
+
+    if (!targetFile.endsWith(`.${ext}`)) {
+      targetFile = `${targetFile}.${ext}`;
     }
 
     const targetDir = path.dirname(targetFile);
