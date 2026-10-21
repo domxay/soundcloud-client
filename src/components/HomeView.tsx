@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Track, Playlist } from '@/types';
 import { soundcloudApi } from '@/services/api';
 import { formatRelativeTime } from '@/services/utils';
@@ -42,6 +43,7 @@ export default function HomeView({
   onOpenComments,
   onNavigateTab,
 }: HomeViewProps) {
+  const navigate = useNavigate();
   const [activeGenre, setActiveGenre] = useState('All');
   const activeGenreRef = useRef('All');
   const [charts, setCharts] = useState<Track[]>([]);
@@ -207,10 +209,26 @@ export default function HomeView({
                 <h1 className="text-2xl md:text-4xl font-black text-white leading-tight truncate">
                   {heroTrack.title}
                 </h1>
-                <p className="text-sm md:text-base text-sc-text-secondary mt-1 font-medium">
-                  {heroTrack.artist} &bull; <span className="text-sc-accent font-semibold">{heroTrack.plays} прослушиваний</span>
+                <p className="text-sm md:text-base text-sc-text-secondary mt-1 font-medium flex flex-wrap items-center justify-center md:justify-start gap-1.5">
+                  <span
+                    className="text-white hover:underline cursor-pointer"
+                    onClick={() => navigate(`/artist/${encodeURIComponent(heroTrack.artist)}`)}
+                  >
+                    {heroTrack.artist}
+                  </span>
+                  {heroTrack.plays && (
+                    <>
+                      <span>&bull;</span>
+                      <span className="text-sc-accent font-semibold">{heroTrack.plays} plays</span>
+                    </>
+                  )}
                   {(heroTrack.created_at || heroTrack.display_date) && (
-                    <span className="text-sc-text-secondary/70"> &bull; {formatRelativeTime(heroTrack.created_at || heroTrack.display_date)}</span>
+                    <>
+                      <span>&bull;</span>
+                      <span className="text-sc-text-secondary/70">
+                        {formatRelativeTime(heroTrack.created_at || heroTrack.display_date)}
+                      </span>
+                    </>
                   )}
                 </p>
 

@@ -162,17 +162,18 @@ export class AudioService {
       }
     });
 
-    this.audio.addEventListener('error', () => {
-      if (this.currentTrack && !this.hls) {
-        soundcloudApi
-          .getTrackStreamUrl(this.currentTrack)
-          .then((url) => {
-            if (url && url !== this.audio.src) {
-              this.audio.src = url;
-              this.audio.play().catch(() => {});
-            }
-          })
-          .catch(() => {});
+    this.audio.addEventListener('error', async () => {
+      if (this.currentTrack) {
+        const fresh = await soundcloudApi.getTrackStreamUrl(this.currentTrack, true);
+        if (fresh) {
+          if (this.hls) {
+            this.hls.loadSource(fresh);
+            this.hls.startLoad();
+          } else {
+            this.audio.src = fresh;
+            this.audio.play().catch(() => {});
+          }
+        }
       }
     });
   }
@@ -251,16 +252,20 @@ export class AudioService {
     this.repeatMode = repeat;
   }
 
-  private async getStreamUrlWithRetry(track: Track, attempts: number): Promise<string | null> {
+  private async getStreamUrlWithRetry(
+    track: Track,
+    attempts: number,
+    forceRefresh = false
+  ): Promise<string | null> {
     for (let i = 0; i < attempts; i++) {
-      const url = await soundcloudApi.getTrackStreamUrl(track);
+      const url = await soundcloudApi.getTrackStreamUrl(track, forceRefresh || i > 0);
       if (url) return url;
       await new Promise((r) => setTimeout(r, 400 * (i + 1)));
     }
     return null;
   }
 
-  public async playTrack(track: Track): Promise<void> {
+  public async playTrack(track: Track, forceRefresh = false): Promise<void> {
     this.currentTrack = track;
 
     if (this.hls) {
@@ -268,7 +273,9 @@ export class AudioService {
       this.hls = null;
     }
 
-    const streamUrl = await this.getStreamUrlWithRetry(track, 3);
+    this.audio.currentTime = 0;
+
+    const streamUrl = await this.getStreamUrlWithRetry(track, 3, forceRefresh);
     if (!streamUrl) {
       if (this.onEndedCallback) {
         setTimeout(() => this.onEndedCallback?.(), 0);
@@ -289,10 +296,22 @@ export class AudioService {
         fragLoadingMaxRetry: 6,
       });
 
-      this.hls.on(Hls.Events.ERROR, (_event, data) => {
+      this.hls.on(Hls.Events.ERROR, async (_event, data) => {
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
+              if (
+                this.currentTrack &&
+                data.response &&
+                (data.response.code === 403 || data.response.code === 404)
+              ) {
+                const freshUrl = await soundcloudApi.getTrackStreamUrl(this.currentTrack, true);
+                if (freshUrl && this.hls) {
+                  this.hls.loadSource(freshUrl);
+                  this.hls.startLoad();
+                  return;
+                }
+              }
               this.hls?.startLoad();
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
@@ -310,11 +329,13 @@ export class AudioService {
       this.hls.attachMedia(this.audio);
       this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
         this.audio.playbackRate = this.speed;
+        this.audio.currentTime = 0;
         this.audio.play().catch(() => {});
       });
     } else {
       this.audio.src = streamUrl;
       this.audio.playbackRate = this.speed;
+      this.audio.currentTime = 0;
       this.audio.play().catch(() => {});
     }
   }
@@ -323,7 +344,18 @@ export class AudioService {
     if (this.isPlaying) {
       this.audio.pause();
     } else {
-      this.audio.play().catch(() => {});
+      const duration = this.audio.duration || this.currentTrack?.duration || 0;
+      if (
+        this.audio.ended ||
+        (duration > 0 && this.audio.currentTime >= duration - 0.5)
+      ) {
+        this.audio.currentTime = 0;
+      }
+      this.audio.play().catch(async () => {
+        if (this.currentTrack) {
+          await this.playTrack(this.currentTrack, true);
+        }
+      });
     }
   }
 

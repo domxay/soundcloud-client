@@ -98,8 +98,9 @@ export const TrackRow: React.FC<TrackRowProps> = ({
       </div>
 
       {track.plays && (
-        <span className="text-xs text-[#666666] shrink-0 hidden md:inline">
-          ▶ {track.plays}
+        <span className="text-xs text-[#777777] shrink-0 hidden md:inline-flex items-center gap-1 tabular-nums">
+          <Play size={10} className="fill-current text-[#777777]" />
+          <span>{track.plays}</span>
         </span>
       )}
 

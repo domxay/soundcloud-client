@@ -153,10 +153,13 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
     if (!raw) return;
     let finalUrl = raw;
     if (/^[a-zA-Z]:[\\/]/.test(raw)) {
-      finalUrl = `local-media://${encodeURI(raw.replace(/\\/g, '/'))}`;
+      finalUrl = `local-media://asset/${raw.replace(/\\/g, '/')}`;
     } else if (raw.startsWith('file:///')) {
       const pathPart = raw.replace(/^file:\/\/\//, '');
-      finalUrl = `local-media://${pathPart}`;
+      finalUrl = `local-media://asset/${pathPart}`;
+    } else if (raw.startsWith('local-media://') && !raw.startsWith('local-media://asset/')) {
+      const pathPart = raw.replace(/^local-media:\/*/, '');
+      finalUrl = `local-media://asset/${pathPart}`;
     }
 
     const isVideo =
@@ -352,9 +355,11 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                           key={bgConfig.url}
                           src={
                             bgConfig.url.startsWith('file:///')
-                              ? `local-media://${bgConfig.url.replace(/^file:\/\/\//, '')}`
+                              ? `local-media://asset/${bgConfig.url.replace(/^file:\/\/\//, '')}`
                               : /^[a-zA-Z]:[\\/]/.test(bgConfig.url)
-                              ? `local-media://${encodeURI(bgConfig.url.replace(/\\/g, '/'))}`
+                              ? `local-media://asset/${bgConfig.url.replace(/\\/g, '/')}`
+                              : bgConfig.url.startsWith('local-media://') && !bgConfig.url.startsWith('local-media://asset/')
+                              ? `local-media://asset/${bgConfig.url.replace(/^local-media:\/*/, '')}`
                               : bgConfig.url
                           }
                           autoPlay
@@ -368,9 +373,11 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                         <img
                           src={
                             bgConfig.url.startsWith('file:///')
-                              ? `local-media://${bgConfig.url.replace(/^file:\/\/\//, '')}`
+                              ? `local-media://asset/${bgConfig.url.replace(/^file:\/\/\//, '')}`
                               : /^[a-zA-Z]:[\\/]/.test(bgConfig.url)
-                              ? `local-media://${encodeURI(bgConfig.url.replace(/\\/g, '/'))}`
+                              ? `local-media://asset/${bgConfig.url.replace(/\\/g, '/')}`
+                              : bgConfig.url.startsWith('local-media://') && !bgConfig.url.startsWith('local-media://asset/')
+                              ? `local-media://asset/${bgConfig.url.replace(/^local-media:\/*/, '')}`
                               : bgConfig.url
                           }
                           alt="Current wallpaper"

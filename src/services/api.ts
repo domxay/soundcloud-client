@@ -165,15 +165,20 @@ export class SoundCloudApi {
     return [...progressive, ...hlsAac, ...hlsOther, ...other];
   }
 
-  public async getTrackStreamUrl(track: Track): Promise<string | null> {
-    const cached = this.streamUrlCache.get(track.id);
-    if (cached && Date.now() - cached.ts < 300000) {
-      track.streamUrl = cached.url;
-      return cached.url;
-    }
-    if (track.streamUrl) {
-      this.streamUrlCache.set(track.id, { url: track.streamUrl, ts: Date.now() });
-      return track.streamUrl;
+  public async getTrackStreamUrl(track: Track, forceRefresh = false): Promise<string | null> {
+    if (forceRefresh) {
+      this.streamUrlCache.delete(track.id);
+      delete (track as any).streamUrl;
+    } else {
+      const cached = this.streamUrlCache.get(track.id);
+      if (cached && Date.now() - cached.ts < 180000) {
+        track.streamUrl = cached.url;
+        return cached.url;
+      }
+      if (track.streamUrl) {
+        this.streamUrlCache.set(track.id, { url: track.streamUrl, ts: Date.now() });
+        return track.streamUrl;
+      }
     }
 
     let transcodings = track.media?.transcodings;

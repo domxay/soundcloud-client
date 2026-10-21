@@ -458,7 +458,7 @@ ipcMain.handle('sc:select-background-file', async () => {
   const normalized = filePath.replace(/\\/g, '/');
   const isVideo = /\.(mp4|webm|m4v|mov|mkv)$/i.test(normalized);
   return {
-    url: `local-media://${encodeURI(normalized)}`,
+    url: `local-media://asset/${normalized}`,
     type: isVideo ? 'video' : 'image',
     fileName: path.basename(filePath),
   };
@@ -729,14 +729,20 @@ app.whenReady().then(async () => {
   try {
     protocol.handle('local-media', (request) => {
       try {
-        let raw = request.url.replace(/^local-media:\/+/i, '');
-        let decoded = decodeURIComponent(raw);
-        if (process.platform === 'win32' && /^\/[a-zA-Z]:/.test(decoded)) {
+        const u = new URL(request.url);
+        let decoded = decodeURIComponent(u.pathname);
+        if (u.host && /^[a-zA-Z]$/.test(u.host)) {
+          decoded = u.host + ':' + decoded;
+        } else if (u.host && u.host !== 'asset' && u.host !== 'local' && u.host !== 'localhost') {
+          decoded = u.host + decoded;
+        }
+        if (/^\/[a-zA-Z]:/.test(decoded)) {
           decoded = decoded.slice(1);
         }
         const targetPath = path.resolve(decoded);
         if (!fs.existsSync(targetPath)) {
-          return new Response('File not found', { status: 404 });
+          console.error('[local-media] File not found:', targetPath);
+          return new Response('File not found: ' + targetPath, { status: 404 });
         }
         const fileUrl = pathToFileURL(targetPath).toString();
         return net.fetch(fileUrl);

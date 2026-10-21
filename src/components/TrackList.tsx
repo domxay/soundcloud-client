@@ -28,12 +28,12 @@ export default function TrackList({
   const navigate = useNavigate();
   return (
     <div className="px-8 pb-32">
-      <div className="grid grid-cols-[28px_1fr_180px_80px_60px_140px_30px] items-center gap-4 border-b border-sc-border pb-2 text-xs font-semibold uppercase tracking-wider text-sc-text-secondary select-none">
+      <div className="grid grid-cols-[28px_1fr_160px_70px_100px_130px_30px] items-center gap-4 border-b border-sc-border pb-2 text-xs font-semibold uppercase tracking-wider text-sc-text-secondary select-none">
         <span className="text-center">#</span>
-        <span>Название</span>
-        <span>Исполнитель</span>
+        <span className="min-w-0 truncate">Название</span>
+        <span className="min-w-0 truncate">Исполнитель</span>
         <span className="text-right">Время</span>
-        <span className="text-right">Прослушиваний</span>
+        <span className="text-right truncate">Прослушивания</span>
         <span className="text-center">Действия</span>
         <span></span>
       </div>
@@ -51,7 +51,7 @@ export default function TrackList({
           return (
             <div
               key={track.id}
-              className={`group grid grid-cols-[28px_1fr_180px_80px_60px_140px_30px] items-center gap-4 rounded-sc py-2.5 transition-colors hover:bg-[#1f1f1f] select-none ${
+              className={`group grid grid-cols-[28px_1fr_160px_70px_100px_130px_30px] items-center gap-4 rounded-sc py-2.5 transition-colors hover:bg-[#1f1f1f] select-none ${
                 isCurrent ? 'bg-[#1a1a1a]' : ''
               }`}
             >

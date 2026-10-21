@@ -227,11 +227,21 @@ function AppContent() {
 
   const handleTrackPlay = (track: Track, list?: Track[]) => {
     if (currentTrack?.id === track.id) {
-      audioService.togglePlay();
+      if (isPlaying) {
+        audioService.togglePlay();
+      } else {
+        if (currentTime >= (duration - 0.5) || duration === 0) {
+          audioService.playTrack(track, true);
+        } else {
+          audioService.togglePlay();
+        }
+      }
     } else {
       queueService.play(track, list && list.length > 0 ? list : tracks);
       setCurrentTrack(track);
-      setDuration(track.duration);
+      setDuration(track.duration || 0);
+      setProgress(0);
+      setCurrentTime(0);
       audioService.playTrack(track);
     }
   };
@@ -314,17 +324,25 @@ function AppContent() {
     if (!customBg.url) return '';
     const raw = customBg.url.trim();
     if (/^[a-zA-Z]:[\\/]/.test(raw)) {
-      return `local-media://${encodeURI(raw.replace(/\\/g, '/'))}`;
+      return `local-media://asset/${raw.replace(/\\/g, '/')}`;
     }
     if (raw.startsWith('file:///')) {
       const pathPart = raw.replace(/^file:\/\/\//, '');
-      return `local-media://${pathPart}`;
+      return `local-media://asset/${pathPart}`;
+    }
+    if (raw.startsWith('local-media://') && !raw.startsWith('local-media://asset/')) {
+      const pathPart = raw.replace(/^local-media:\/*/, '');
+      return `local-media://asset/${pathPart}`;
     }
     return raw;
   }, [customBg.url]);
 
   return (
-    <div className="min-h-screen bg-[#121212] text-white flex flex-col relative pb-20">
+    <div
+      className={`min-h-screen ${
+        customBg.type !== 'none' && resolvedBgSrc ? 'bg-transparent' : 'bg-[#121212]'
+      } text-white flex flex-col relative pb-20`}
+    >
       {customBg.type !== 'none' && resolvedBgSrc && (
         <div className="sc-bg-layer">
           {customBg.type === 'video' ? (
@@ -349,10 +367,13 @@ function AppContent() {
               alt="Custom background"
               className="w-full h-full object-cover"
               style={{ filter: `blur(${customBg.blur}px)` }}
+              onError={(e) => {
+                console.warn('Image background failed to load:', e);
+              }}
             />
           )}
           <div
-            className="absolute inset-0 bg-black"
+            className="absolute inset-0 bg-black pointer-events-none"
             style={{ opacity: customBg.opacity / 100 }}
           />
         </div>
@@ -560,6 +581,8 @@ function AppContent() {
         isOpen={isQueueOpen}
         onClose={() => setIsQueueOpen(false)}
         onPlayTrack={(t) => handleTrackPlay(t)}
+        isPlaying={isPlaying}
+        onPlayPause={() => audioService.togglePlay()}
       />
 
       <LoginModal
