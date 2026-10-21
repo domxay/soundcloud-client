@@ -7,7 +7,11 @@ export type PlaybackListener = (state: {
   currentTime: number;
   duration: number;
   progress: number;
+  speed: number;
+  sleepTimerSeconds: number | null;
 }) => void;
+
+export type EqualizerPreset = 'flat' | 'bass_boost' | 'treble_boost' | 'vocal' | 'phonk' | 'rock';
 
 export class AudioService {
   private static instance: AudioService;
@@ -18,6 +22,20 @@ export class AudioService {
   private isPlaying: boolean = false;
   private onEndedCallback: (() => void) | null = null;
   private repeatMode: boolean = false;
+  private speed: number = 1.0;
+  private lastNonZeroVolume: number = 75;
+
+  // Sleep Timer
+  private sleepTimerId: any = null;
+  private sleepTimerEndsAt: number | null = null;
+
+  // Web Audio Equalizer
+  private audioContext: AudioContext | null = null;
+  private sourceNode: MediaElementAudioSourceNode | null = null;
+  private bassFilter: BiquadFilterNode | null = null;
+  private midFilter: BiquadFilterNode | null = null;
+  private trebleFilter: BiquadFilterNode | null = null;
+  private currentEqPreset: EqualizerPreset = 'flat';
 
   private constructor() {
     this.audio = new Audio();
@@ -32,9 +50,95 @@ export class AudioService {
     return AudioService.instance;
   }
 
+  private initAudioContext(): void {
+    if (this.audioContext) return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      this.audioContext = new AudioCtx();
+      this.sourceNode = this.audioContext.createMediaElementSource(this.audio);
+
+      // Low shelf (Bass: 100Hz)
+      this.bassFilter = this.audioContext.createBiquadFilter();
+      this.bassFilter.type = 'lowshelf';
+      this.bassFilter.frequency.value = 100;
+      this.bassFilter.gain.value = 0;
+
+      // Peaking (Mid: 1000Hz)
+      this.midFilter = this.audioContext.createBiquadFilter();
+      this.midFilter.type = 'peaking';
+      this.midFilter.frequency.value = 1000;
+      this.midFilter.Q.value = 1;
+      this.midFilter.gain.value = 0;
+
+      // High shelf (Treble: 3000Hz)
+      this.trebleFilter = this.audioContext.createBiquadFilter();
+      this.trebleFilter.type = 'highshelf';
+      this.trebleFilter.frequency.value = 3000;
+      this.trebleFilter.gain.value = 0;
+
+      // Chain: Source -> Bass -> Mid -> Treble -> Destination
+      this.sourceNode.connect(this.bassFilter);
+      this.bassFilter.connect(this.midFilter);
+      this.midFilter.connect(this.trebleFilter);
+      this.trebleFilter.connect(this.audioContext.destination);
+    } catch {}
+  }
+
+  public setEqualizerPreset(preset: EqualizerPreset): void {
+    this.initAudioContext();
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      this.audioContext.resume().catch(() => {});
+    }
+    this.currentEqPreset = preset;
+
+    if (!this.bassFilter || !this.midFilter || !this.trebleFilter) return;
+
+    switch (preset) {
+      case 'bass_boost':
+        this.bassFilter.gain.value = 7.5;
+        this.midFilter.gain.value = 1.0;
+        this.trebleFilter.gain.value = -1.0;
+        break;
+      case 'treble_boost':
+        this.bassFilter.gain.value = -2.0;
+        this.midFilter.gain.value = 1.5;
+        this.trebleFilter.gain.value = 6.0;
+        break;
+      case 'vocal':
+        this.bassFilter.gain.value = -3.0;
+        this.midFilter.gain.value = 5.0;
+        this.trebleFilter.gain.value = 2.0;
+        break;
+      case 'phonk':
+        this.bassFilter.gain.value = 9.0;
+        this.midFilter.gain.value = -2.0;
+        this.trebleFilter.gain.value = 4.0;
+        break;
+      case 'rock':
+        this.bassFilter.gain.value = 4.5;
+        this.midFilter.gain.value = -1.0;
+        this.trebleFilter.gain.value = 4.0;
+        break;
+      case 'flat':
+      default:
+        this.bassFilter.gain.value = 0;
+        this.midFilter.gain.value = 0;
+        this.trebleFilter.gain.value = 0;
+        break;
+    }
+  }
+
+  public getEqualizerPreset(): EqualizerPreset {
+    return this.currentEqPreset;
+  }
+
   private setupListeners(): void {
     this.audio.addEventListener('play', () => {
       this.isPlaying = true;
+      if (this.audioContext && this.audioContext.state === 'suspended') {
+        this.audioContext.resume().catch(() => {});
+      }
       this.notify();
     });
 
@@ -60,12 +164,15 @@ export class AudioService {
 
     this.audio.addEventListener('error', () => {
       if (this.currentTrack && !this.hls) {
-        soundcloudApi.getTrackStreamUrl(this.currentTrack).then((url) => {
-          if (url && url !== this.audio.src) {
-            this.audio.src = url;
-            this.audio.play().catch(() => {});
-          }
-        }).catch(() => {});
+        soundcloudApi
+          .getTrackStreamUrl(this.currentTrack)
+          .then((url) => {
+            if (url && url !== this.audio.src) {
+              this.audio.src = url;
+              this.audio.play().catch(() => {});
+            }
+          })
+          .catch(() => {});
       }
     });
   }
@@ -74,15 +181,59 @@ export class AudioService {
     const duration = this.audio.duration || this.currentTrack?.duration || 0;
     const currentTime = this.audio.currentTime || 0;
     const progress = duration > 0 ? currentTime / duration : 0;
+    let sleepSeconds: number | null = null;
+    if (this.sleepTimerEndsAt) {
+      sleepSeconds = Math.max(0, Math.round((this.sleepTimerEndsAt - Date.now()) / 1000));
+    }
     const state = {
       isPlaying: this.isPlaying,
       currentTime,
       duration,
       progress,
+      speed: this.speed,
+      sleepTimerSeconds: sleepSeconds,
     };
     for (const listener of this.listeners) {
-      listener(state);
+      try {
+        listener(state);
+      } catch {}
     }
+  }
+
+  public setSpeed(speed: number): void {
+    this.speed = Math.max(0.5, Math.min(2.5, speed));
+    this.audio.playbackRate = this.speed;
+    this.notify();
+  }
+
+  public getSpeed(): number {
+    return this.speed;
+  }
+
+  public setSleepTimer(minutes: number | null): void {
+    if (this.sleepTimerId) {
+      clearTimeout(this.sleepTimerId);
+      this.sleepTimerId = null;
+      this.sleepTimerEndsAt = null;
+    }
+    if (!minutes || minutes <= 0) {
+      this.notify();
+      return;
+    }
+
+    this.sleepTimerEndsAt = Date.now() + minutes * 60 * 1000;
+    this.sleepTimerId = setTimeout(() => {
+      this.audio.pause();
+      this.sleepTimerId = null;
+      this.sleepTimerEndsAt = null;
+      this.notify();
+    }, minutes * 60 * 1000);
+    this.notify();
+  }
+
+  public getSleepTimerRemainingSeconds(): number | null {
+    if (!this.sleepTimerEndsAt) return null;
+    return Math.max(0, Math.round((this.sleepTimerEndsAt - Date.now()) / 1000));
   }
 
   public subscribe(listener: PlaybackListener): () => void {
@@ -132,10 +283,10 @@ export class AudioService {
         maxBufferLength: 45,
         maxMaxBufferLength: 90,
         maxBufferSize: 60 * 1000 * 1000,
-        manifestLoadingTimeOut: 10000,
-        manifestLoadingMaxRetry: 4,
-        fragLoadingTimeOut: 15000,
-        fragLoadingMaxRetry: 5,
+        manifestLoadingTimeOut: 12000,
+        manifestLoadingMaxRetry: 5,
+        fragLoadingTimeOut: 18000,
+        fragLoadingMaxRetry: 6,
       });
 
       this.hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -158,10 +309,12 @@ export class AudioService {
       this.hls.loadSource(streamUrl);
       this.hls.attachMedia(this.audio);
       this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        this.audio.playbackRate = this.speed;
         this.audio.play().catch(() => {});
       });
     } else {
       this.audio.src = streamUrl;
+      this.audio.playbackRate = this.speed;
       this.audio.play().catch(() => {});
     }
   }
@@ -181,8 +334,32 @@ export class AudioService {
     }
   }
 
+  public seekBy(deltaSeconds: number): void {
+    const duration = this.audio.duration || this.currentTrack?.duration || 0;
+    if (duration > 0) {
+      const nextTime = Math.max(0, Math.min(duration, this.audio.currentTime + deltaSeconds));
+      this.audio.currentTime = nextTime;
+    }
+  }
+
   public setVolume(vol: number): void {
-    this.audio.volume = Math.max(0, Math.min(1, vol / 100));
+    const clamped = Math.max(0, Math.min(100, vol));
+    if (clamped > 0) {
+      this.lastNonZeroVolume = clamped;
+    }
+    this.audio.volume = clamped / 100;
+  }
+
+  public toggleMute(): number {
+    if (this.audio.volume > 0) {
+      this.lastNonZeroVolume = Math.round(this.audio.volume * 100);
+      this.setVolume(0);
+      return 0;
+    } else {
+      const restore = this.lastNonZeroVolume || 75;
+      this.setVolume(restore);
+      return restore;
+    }
   }
 
   public getCurrentTrack(): Track | null {

@@ -31,20 +31,29 @@ export class SoundCloudApi {
     for (let attempt = 0; attempt < retries; attempt++) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
         const res = await fetch(url, {
           ...init,
           signal: controller.signal,
           headers: { ...this.getHeaders(), ...(init?.headers || {}) },
         });
         clearTimeout(timeoutId);
+
+        // Auto-refresh client ID if 401 Unauthorized occurs
+        if (res.status === 401 && attempt === 0) {
+          await authService.refreshClientId(true);
+          const newUrl = new URL(url);
+          newUrl.searchParams.set('client_id', authService.getClientId());
+          return this.fetchWithRetry(newUrl.toString(), init, retries - 1);
+        }
+
         if (res.ok || res.status === 404 || res.status === 401) {
           return res;
         }
       } catch (err: any) {
         if (attempt === retries - 1) throw err;
       }
-      await new Promise((r) => setTimeout(r, 350 * (attempt + 1)));
+      await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
     }
     return fetch(url, { headers: this.getHeaders() });
   }
@@ -68,7 +77,7 @@ export class SoundCloudApi {
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       'Accept': 'application/json, text/javascript, */*; q=0.01',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     };
     const token = authService.getOAuthToken();
     if (token) {
@@ -105,7 +114,9 @@ export class SoundCloudApi {
 
   private notifyLikes(trackId: number, isLiked: boolean): void {
     for (const listener of this.likeListeners) {
-      listener(trackId, isLiked);
+      try {
+        listener(trackId, isLiked);
+      } catch {}
     }
   }
 
@@ -114,9 +125,7 @@ export class SoundCloudApi {
     if (!token) return null;
 
     try {
-      const res = await fetch(this.buildUrl('/me'), {
-        headers: this.getHeaders(),
-      });
+      const res = await this.fetchWithRetry(this.buildUrl('/me'));
       if (!res.ok) return null;
       const data = await res.json();
       return {
@@ -137,6 +146,25 @@ export class SoundCloudApi {
     }
   }
 
+  // Filter and prioritize reliable transcodings (avoiding SoundCloud 404s like abr_sq)
+  private prioritizeTranscodings(transcodings: any[]): any[] {
+    if (!transcodings || !Array.isArray(transcodings)) return [];
+
+    // Filter out abr_sq preset which is consistently 404 on SoundCloud
+    const clean = transcodings.filter((t) => t.preset !== 'abr_sq');
+
+    const progressive = clean.filter((t) => t.format?.protocol === 'progressive');
+    const hlsAac = clean.filter(
+      (t) =>
+        t.format?.protocol === 'hls' &&
+        (t.preset === 'aac_160k' || t.preset === 'aac_96k' || t.format?.mime_type?.includes('mp4'))
+    );
+    const hlsOther = clean.filter((t) => t.format?.protocol === 'hls' && !hlsAac.includes(t));
+    const other = clean.filter((t) => !progressive.includes(t) && !hlsAac.includes(t) && !hlsOther.includes(t));
+
+    return [...progressive, ...hlsAac, ...hlsOther, ...other];
+  }
+
   public async getTrackStreamUrl(track: Track): Promise<string | null> {
     const cached = this.streamUrlCache.get(track.id);
     if (cached && Date.now() - cached.ts < 300000) {
@@ -151,41 +179,45 @@ export class SoundCloudApi {
     let transcodings = track.media?.transcodings;
     if (!transcodings || transcodings.length === 0) {
       try {
-        const trackRes = await fetch(this.buildUrl(`/tracks/${track.id}`), {
-          headers: this.getHeaders(),
-        });
+        const trackRes = await this.fetchWithRetry(this.buildUrl(`/tracks/${track.id}`));
         if (trackRes.ok) {
           const trackData = await trackRes.json();
           transcodings = trackData.media?.transcodings;
+          if (trackData.track_authorization && !track.track_authorization) {
+            track.track_authorization = trackData.track_authorization;
+          }
         }
       } catch {
         return null;
       }
     }
 
-    if (!transcodings || transcodings.length === 0) return null;
+    const ordered = this.prioritizeTranscodings(transcodings || []);
+    if (ordered.length === 0) return null;
 
-    const progressive = transcodings.find((t) => t.format.protocol === 'progressive');
-    const hls = transcodings.find((t) => t.format.protocol === 'hls');
-    const selected = progressive || hls || transcodings[0];
+    // Try ordered transcodings sequentially until a working stream is resolved
+    for (const selected of ordered) {
+      try {
+        const url = new URL(selected.url);
+        url.searchParams.set('client_id', authService.getClientId());
+        if (track.track_authorization) {
+          url.searchParams.set('track_authorization', track.track_authorization);
+        }
 
-    try {
-      const url = new URL(selected.url);
-      url.searchParams.set('client_id', authService.getClientId());
-      const res = await fetch(url.toString(), {
-        headers: this.getHeaders(),
-      });
-      if (!res.ok) return null;
-      const data = await res.json();
-      const streamUrl = data.url || null;
-      if (streamUrl) {
-        track.streamUrl = streamUrl;
-        this.streamUrlCache.set(track.id, { url: streamUrl, ts: Date.now() });
-      }
-      return streamUrl;
-    } catch {
-      return null;
+        const res = await this.fetchWithRetry(url.toString(), undefined, 2);
+        if (!res.ok) continue;
+
+        const data = await res.json();
+        const streamUrl = data.url || null;
+        if (streamUrl) {
+          track.streamUrl = streamUrl;
+          this.streamUrlCache.set(track.id, { url: streamUrl, ts: Date.now() });
+          return streamUrl;
+        }
+      } catch {}
     }
+
+    return null;
   }
 
   public async searchTracks(query: string, limit: number = 35): Promise<Track[]> {
@@ -231,9 +263,7 @@ export class SoundCloudApi {
     const existing = this.getTrack(id);
     if (existing) return existing;
     try {
-      const res = await fetch(this.buildUrl(`/tracks/${id}`), {
-        headers: this.getHeaders(),
-      });
+      const res = await this.fetchWithRetry(this.buildUrl(`/tracks/${id}`));
       if (!res.ok) return null;
       const data = await res.json();
       const t = this.mapRawTrack(data);
@@ -246,9 +276,7 @@ export class SoundCloudApi {
 
   public async getUserPlayHistory(): Promise<Track[]> {
     try {
-      const res = await fetch(this.buildUrl('/me/play-history/tracks', { limit: 40 }), {
-        headers: this.getHeaders(),
-      });
+      const res = await this.fetchWithRetry(this.buildUrl('/me/play-history/tracks', { limit: 40 }));
       if (!res.ok) return [];
       const data = await res.json();
       const collection = data.collection || [];
@@ -272,9 +300,7 @@ export class SoundCloudApi {
     const userId = session.user?.id || 1764659103;
 
     try {
-      const res = await fetch(this.buildUrl(`/users/${userId}/likes`, { limit: 50 }), {
-        headers: this.getHeaders(),
-      });
+      const res = await this.fetchWithRetry(this.buildUrl(`/users/${userId}/likes`, { limit: 50 }));
       let remoteLikes: Track[] = [];
       if (res.ok) {
         const data = await res.json();
@@ -378,9 +404,7 @@ export class SoundCloudApi {
       for (let i = 0; i < stubIds.length; i += chunkSize) {
         const slice = stubIds.slice(i, i + chunkSize);
         try {
-          const res = await fetch(this.buildUrl('/tracks', { ids: slice.join(',') }), {
-            headers: this.getHeaders(),
-          });
+          const res = await this.fetchWithRetry(this.buildUrl('/tracks', { ids: slice.join(',') }));
           if (res.ok) {
             const fetched = await res.json();
             if (Array.isArray(fetched)) {
@@ -406,28 +430,44 @@ export class SoundCloudApi {
     return fullTracks;
   }
 
+  private normalizeTitleKey(title: string): string {
+    return (title || '')
+      .toLowerCase()
+      .replace(/^(related\s+tracks\s*:?|stations?\s+based\s+on\s*:?|station\s*:?|track\s+station\s*:?|playlist\s*:?)/i, '')
+      .replace(/[^a-z0-9а-яё]/gi, '')
+      .trim();
+  }
+
   public async getUserPlaylists(): Promise<Playlist[]> {
     const session = authService.getSession();
     const userId = session.user?.id;
     const playlists: Playlist[] = [];
+    const seenIds = new Set<string | number>();
+    const seenTitles = new Set<string>();
 
     if (userId) {
       try {
-        const res = await fetch(this.buildUrl(`/users/${userId}/playlists`, { limit: 20 }), {
-          headers: this.getHeaders(),
-        });
+        const res = await this.fetchWithRetry(this.buildUrl(`/users/${userId}/playlists`, { limit: 30 }));
         if (res.ok) {
           const data = await res.json();
           const collection = data.collection || [];
           for (const item of collection) {
             const p = item.playlist || item;
+            if (!p || !p.title) continue;
+            const norm = this.normalizeTitleKey(p.title);
+            if (seenIds.has(p.id) || (norm && seenTitles.has(norm))) continue;
+
             const resolvedTracks = await this.resolvePlaylistTracks(p.tracks || []);
-            const fallbackArtwork = resolvedTracks.length > 0 ? resolvedTracks[0].artwork : '';
+            const fallbackArtwork = resolvedTracks.length > 0 ? resolvedTracks[0].artwork : (p.artwork_url || p.user?.avatar_url || '');
+            
+            seenIds.add(p.id);
+            if (norm) seenTitles.add(norm);
+
             playlists.push({
               id: p.id,
               title: p.title,
               artist: p.user?.username || session.user?.username || 'You',
-              artwork: p.artwork_url || fallbackArtwork || p.user?.avatar_url || '',
+              artwork: p.artwork_url || fallbackArtwork,
               updatedDaysAgo: this.daysAgo(p.last_modified || p.created_at),
               created_at: p.created_at,
               updated_at: p.last_modified || p.updated_at,
@@ -439,9 +479,11 @@ export class SoundCloudApi {
     }
 
     const featured = await this.getFeaturedPlaylists();
-    const existingIds = new Set(playlists.map((p) => p.id));
     for (const f of featured) {
-      if (!existingIds.has(f.id)) {
+      const norm = this.normalizeTitleKey(f.title);
+      if (!seenIds.has(f.id) && (!norm || !seenTitles.has(norm))) {
+        seenIds.add(f.id);
+        if (norm) seenTitles.add(norm);
         playlists.push(f);
       }
     }
@@ -449,11 +491,9 @@ export class SoundCloudApi {
     return playlists;
   }
 
-  public async getPlaylistDetails(playlistId: number): Promise<Playlist | null> {
+  public async getPlaylistDetails(playlistId: number | string): Promise<Playlist | null> {
     try {
-      const res = await fetch(this.buildUrl(`/playlists/${playlistId}`), {
-        headers: this.getHeaders(),
-      });
+      const res = await this.fetchWithRetry(this.buildUrl(`/playlists/${playlistId}`));
       if (!res.ok) return null;
       const p = await res.json();
       const resolvedTracks = await this.resolvePlaylistTracks(p.tracks || []);
@@ -461,7 +501,7 @@ export class SoundCloudApi {
       return {
         id: p.id,
         title: p.title || 'SoundCloud Playlist',
-        artist: p.user?.username || 'SoundCloud Curated',
+        artist: p.user?.username === 'New!' ? 'SoundCloud Curated' : (p.user?.username || 'SoundCloud Curated'),
         artwork: p.artwork_url || fallbackArtwork || p.user?.avatar_url || '',
         updatedDaysAgo: this.daysAgo(p.last_modified || p.created_at),
         created_at: p.created_at,
@@ -474,51 +514,107 @@ export class SoundCloudApi {
   }
 
   public async getFeaturedPlaylists(): Promise<Playlist[]> {
-    const cached = this.getCachedData<Playlist[]>('featured_playlists');
+    const cached = this.getCachedData<Playlist[]>('featured_playlists_v2');
     if (cached && cached.length > 0) return cached;
 
     const playlists: Playlist[] = [];
+    const seenIds = new Set<string | number>();
+    const seenTitles = new Set<string>();
+
+    const addPlaylistIfUnique = (p: Playlist): boolean => {
+      if (!p || !p.title) return false;
+      const rawTitle = p.title.trim();
+      const lower = rawTitle.toLowerCase();
+
+      // Exclude automated track stations to eliminate repeated "Related tracks: ..." cards
+      if (
+        lower.startsWith('related tracks:') ||
+        lower.startsWith('station:') ||
+        lower.startsWith('stations based on') ||
+        String(p.id).includes('track-station')
+      ) {
+        return false;
+      }
+
+      if (seenIds.has(p.id)) return false;
+
+      const norm = this.normalizeTitleKey(p.title);
+      if (!norm || seenTitles.has(norm)) return false;
+
+      seenIds.add(p.id);
+      seenTitles.add(norm);
+
+      // Clean up artist if it was set to editorial badge like "New!"
+      if (p.artist === 'New!' || !p.artist) {
+        p.artist = 'SoundCloud Editorial';
+      }
+
+      playlists.push(p);
+      return true;
+    };
 
     try {
-      const res = await this.fetchWithRetry(this.buildUrl('/mixed-selections', { limit: 10 }));
+      const res = await this.fetchWithRetry(this.buildUrl('/mixed-selections', { limit: 12 }));
       if (res.ok) {
         const data = await res.json();
         for (const section of data.collection || []) {
           for (const item of section.items?.collection || []) {
-            if (item.kind === 'playlist' || item.id) {
-              const fallbackArtwork = item.artwork_url || item.user?.avatar_url || '';
-              const resolvedTracks = item.tracks ? await this.resolvePlaylistTracks(item.tracks.slice(0, 35)) : [];
-              playlists.push({
-                id: item.id,
-                title: item.title,
-                artist: item.user?.username || section.title || 'Curated',
-                artwork: fallbackArtwork,
-                updatedDaysAgo: this.daysAgo(item.last_modified || item.created_at),
-                created_at: item.created_at,
-                updated_at: item.last_modified || item.updated_at,
-                tracks: resolvedTracks,
-              });
-            }
+            if (!item) continue;
+            if (item.kind === 'track') continue;
+
+            const title = item.title || item.name;
+            if (!title) continue;
+
+            const fallbackArtwork =
+              item.artwork_url ||
+              item.user?.avatar_url ||
+              (item.tracks?.[0]?.artwork_url) ||
+              '';
+
+            const resolvedTracks = item.tracks
+              ? await this.resolvePlaylistTracks(item.tracks.slice(0, 35))
+              : [];
+
+            const p: Playlist = {
+              id: item.id,
+              title: title,
+              artist: item.user?.username || section.title || 'SoundCloud Curated',
+              artwork: fallbackArtwork || (resolvedTracks[0]?.artwork ?? ''),
+              updatedDaysAgo: this.daysAgo(item.last_modified || item.created_at),
+              created_at: item.created_at,
+              updated_at: item.last_modified || item.updated_at,
+              tracks: resolvedTracks,
+            };
+
+            addPlaylistIfUnique(p);
           }
         }
       }
     } catch {}
 
-    if (playlists.length < 5) {
-      const queries = ['Top Hits 2026', 'Phonk 2026', 'Cyberpunk Synthwave', 'Hip Hop Essentials'];
-      for (const q of queries) {
+    // Ensure all categories (Curated, Electronic, Hip-Hop, Indie & Pop, Rock) have rich editorial content
+    if (playlists.length < 24) {
+      const curatedQueries = [
+        'SoundCloud Weekly',
+        'Electronic Essentials',
+        'Hip-Hop Hits 2026',
+        'Emerging Indie Dreams',
+        'Rock & Metal Buzzing',
+        'Top 50 Hits',
+        'Phonk & Wave',
+        'New Techno Now',
+      ];
+      for (const q of curatedQueries) {
         try {
-          const res = await fetch(this.buildUrl('/search/playlists', { q, limit: 3 }), {
-            headers: this.getHeaders(),
-          });
+          const res = await this.fetchWithRetry(this.buildUrl('/search/playlists', { q, limit: 3 }));
           if (res.ok) {
             const data = await res.json();
             for (const item of data.collection || []) {
               const p = item.playlist || item;
-              if (p.tracks && p.tracks.length > 0) {
+              if (p && p.title && p.tracks && p.tracks.length > 0) {
                 const resolvedTracks = await this.resolvePlaylistTracks(p.tracks.slice(0, 25));
                 if (resolvedTracks.length > 0) {
-                  playlists.push({
+                  const entry: Playlist = {
                     id: p.id,
                     title: p.title,
                     artist: p.user?.username || 'SoundCloud Curated',
@@ -527,7 +623,8 @@ export class SoundCloudApi {
                     created_at: p.created_at,
                     updated_at: p.last_modified || p.updated_at,
                     tracks: resolvedTracks,
-                  });
+                  };
+                  addPlaylistIfUnique(entry);
                 }
               }
             }
@@ -537,7 +634,7 @@ export class SoundCloudApi {
     }
 
     if (playlists.length > 0) {
-      this.setCachedData('featured_playlists', playlists, 300000);
+      this.setCachedData('featured_playlists_v2', playlists, 300000);
     }
 
     return playlists;
@@ -573,9 +670,7 @@ export class SoundCloudApi {
     } catch {}
 
     try {
-      const res = await fetch(this.buildUrl('/search/tracks', { q: 'Top 50 Hits 2026', limit: 35 }), {
-        headers: this.getHeaders(),
-      });
+      const res = await this.fetchWithRetry(this.buildUrl('/search/tracks', { q: 'Top 50 Hits 2026', limit: 35 }));
       if (!res.ok) return [];
       const data = await res.json();
       const collection = data.collection || [];
@@ -594,9 +689,7 @@ export class SoundCloudApi {
 
   public async getNewReleases(): Promise<Track[]> {
     try {
-      const res = await fetch(this.buildUrl('/search/tracks', { q: '2026 new releases music', limit: 30 }), {
-        headers: this.getHeaders(),
-      });
+      const res = await this.fetchWithRetry(this.buildUrl('/search/tracks', { q: '2026 new releases music', limit: 30 }));
       if (!res.ok) return [];
       const data = await res.json();
       const collection = data.collection || [];
@@ -651,9 +744,9 @@ export class SoundCloudApi {
     } catch {}
 
     try {
-      const res = await fetch(this.buildUrl(`/tracks/${trackId}/comments`, { threaded: 0, filter_replies: 0, limit: 40 }), {
-        headers: this.getHeaders(),
-      });
+      const res = await this.fetchWithRetry(
+        this.buildUrl(`/tracks/${trackId}/comments`, { threaded: 0, filter_replies: 0, limit: 40 })
+      );
       let remoteComments: Comment[] = [];
       if (res.ok) {
         const data = await res.json();
@@ -773,6 +866,7 @@ export class SoundCloudApi {
       display_date: raw.display_date || raw.created_at || undefined,
       waveform_url: raw.waveform_url,
       media: raw.media,
+      track_authorization: raw.track_authorization,
     };
   }
 }

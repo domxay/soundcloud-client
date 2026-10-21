@@ -35,6 +35,8 @@ function AppContent() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(75);
+  const [speed, setSpeed] = useState(1.0);
+  const [sleepTimerSeconds, setSleepTimerSeconds] = useState<number | null>(null);
   const [shuffle, setShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'off' | 'one' | 'all'>('off');
   const [playlistLiked, setPlaylistLiked] = useState(false);
@@ -83,11 +85,56 @@ function AppContent() {
     }
   }, [currentTime]);
 
+  // Global hotkeys: Space, Left/Right, Up/Down, M, L
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = (document.activeElement?.tagName || '').toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea') return;
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        audioService.togglePlay();
+      } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        audioService.seekBy(-5);
+      } else if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        audioService.seekBy(5);
+      } else if (e.code === 'ArrowUp') {
+        e.preventDefault();
+        setVolume((v) => {
+          const nv = Math.min(100, v + 5);
+          audioService.setVolume(nv);
+          return nv;
+        });
+      } else if (e.code === 'ArrowDown') {
+        e.preventDefault();
+        setVolume((v) => {
+          const nv = Math.max(0, v - 5);
+          audioService.setVolume(nv);
+          return nv;
+        });
+      } else if (e.key === 'm' || e.key === 'M' || e.key === 'ь' || e.key === 'Ь') {
+        const nextVol = audioService.toggleMute();
+        setVolume(nextVol);
+      } else if (e.key === 'l' || e.key === 'L' || e.key === 'д' || e.key === 'Д') {
+        if (currentTrack) {
+          handleLikeToggle(currentTrack.id);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentTrack]);
+
   useEffect(() => {
     const unsubAudio = audioService.subscribe((state) => {
       setIsPlaying(state.isPlaying);
       setCurrentTime(state.currentTime);
       setProgress(state.progress);
+      setSpeed(state.speed);
+      setSleepTimerSeconds(state.sleepTimerSeconds);
       if (state.duration > 0) {
         setDuration(state.duration);
       }
@@ -456,6 +503,8 @@ function AppContent() {
           queueCount={queueService.getState().items.length}
           isQueueOpen={isQueueOpen}
           comments={currentTrackComments}
+          speed={speed}
+          sleepTimerSeconds={sleepTimerSeconds}
           onPlayPause={() => audioService.togglePlay()}
           onPrev={handlePrev}
           onNext={handleNext}

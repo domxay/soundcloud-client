@@ -10,12 +10,16 @@ interface ImportMeta {
 interface Window {
   electronAPI?: {
     openLoginWindow: () => Promise<{ success: boolean; token?: string; clientId?: string; error?: string }>;
+    syncSession?: () => Promise<{ success: boolean; token?: string; clientId?: string; error?: string }>;
+    getClientId?: (forceRefresh?: boolean) => Promise<string>;
     downloadTrack: (trackData: {
+      id?: number;
       title: string;
       artist: string;
+      artwork?: string;
       streamUrl: string;
-      destinationPath?: string;
-      destinationFolder?: string;
+      destinationPath?: string | null;
+      destinationFolder?: string | null;
     }) => Promise<{ success: boolean; filePath?: string; error?: string }>;
     openDownloadsFolder: () => Promise<boolean>;
     minimizeWindow: () => Promise<void>;
@@ -24,8 +28,9 @@ interface Window {
     selectSaveFile: (defaultName: string) => Promise<string | null>;
     selectDownloadFolder: () => Promise<string | null>;
     selectBackgroundFile: () => Promise<{ url: string; type: 'video' | 'image' } | null>;
-    setProxy: (rule: string | null) => Promise<{ success: boolean; proxy?: string | null }>;
-    detectLocalProxy?: () => Promise<{ success: boolean; proxy?: string; name?: string }>;
+    setProxy: (rule: string | null) => Promise<{ success: boolean; proxy?: string | null; error?: string }>;
+    testProxy?: (rule: string | null) => Promise<{ success: boolean; latency?: number; status?: number; error?: string }>;
+    detectLocalProxy?: () => Promise<{ success: boolean; proxy?: string; name?: string; candidates?: any[] }>;
     getNetworkSettings?: () => Promise<{ dohEnabled?: boolean; builtinProxyEnabled?: boolean; builtinProxyPort?: number }>;
     setDoh?: (enabled: boolean) => Promise<{ success: boolean; requiresRestart?: boolean }>;
     builtinProxyStart?: (port: number) => Promise<{ success: boolean; port?: number; error?: string }>;

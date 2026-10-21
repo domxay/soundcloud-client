@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Play,
   Pause,
@@ -15,9 +15,18 @@ import {
   Loader2,
   MessageSquare,
   Mic2,
+  SlidersHorizontal,
+  Clock,
+  Gauge,
+  Zap,
+  Sparkles,
+  Mic,
+  Radio,
+  LucideIcon,
 } from 'lucide-react';
 import { Track, Comment } from '@/types';
 import { formatTime } from '@/services/utils';
+import { audioService, EqualizerPreset } from '@/services/audio';
 import Waveform from './Waveform';
 
 interface MiniPlayerProps {
@@ -34,6 +43,8 @@ interface MiniPlayerProps {
   queueCount?: number;
   isQueueOpen?: boolean;
   comments?: Comment[];
+  speed?: number;
+  sleepTimerSeconds?: number | null;
   onPlayPause: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -64,6 +75,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   queueCount = 0,
   isQueueOpen = false,
   comments = [],
+  speed = 1.0,
+  sleepTimerSeconds = null,
   onPlayPause,
   onPrev,
   onNext,
@@ -79,10 +92,54 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   onTrackTitleClick,
   onArtistClick,
 }) => {
+  const [eqOpen, setEqOpen] = useState(false);
+  const [speedOpen, setSpeedOpen] = useState(false);
+  const [timerOpen, setTimerOpen] = useState(false);
+  const [currentEq, setCurrentEq] = useState<EqualizerPreset>(audioService.getEqualizerPreset());
+
   if (!track) return null;
 
+  const handleSelectEq = (preset: EqualizerPreset) => {
+    audioService.setEqualizerPreset(preset);
+    setCurrentEq(preset);
+    setEqOpen(false);
+  };
+
+  const handleSelectSpeed = (s: number) => {
+    audioService.setSpeed(s);
+    setSpeedOpen(false);
+  };
+
+  const handleSelectTimer = (min: number | null) => {
+    audioService.setSleepTimer(min);
+    setTimerOpen(false);
+  };
+
+  const handleToggleMute = () => {
+    const next = audioService.toggleMute();
+    onVolume(next);
+  };
+
+  const speeds = [0.75, 1.0, 1.25, 1.5, 2.0];
+  const timers = [
+    { label: 'Off', val: null },
+    { label: '15 min', val: 15 },
+    { label: '30 min', val: 30 },
+    { label: '45 min', val: 45 },
+    { label: '60 min', val: 60 },
+  ];
+  const eqPresets: { id: EqualizerPreset; label: string; icon: LucideIcon }[] = [
+    { id: 'flat', label: 'Flat (Standard)', icon: SlidersHorizontal },
+    { id: 'bass_boost', label: 'Bass Boost', icon: Volume2 },
+    { id: 'phonk', label: 'Phonk & Sub-Bass', icon: Zap },
+    { id: 'treble_boost', label: 'Treble Boost', icon: Sparkles },
+    { id: 'vocal', label: 'Vocal Clarity', icon: Mic },
+    { id: 'rock', label: 'Rock & Dynamic', icon: Radio },
+  ];
+
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 flex h-[72px] items-center gap-4 border-t border-[#222222] bg-[#141414]/95 px-5 backdrop-blur-md select-none">
+    <div className="fixed bottom-0 left-0 right-0 z-40 flex h-[74px] items-center gap-4 border-t border-[#222222] bg-[#141414]/95 px-5 backdrop-blur-md select-none">
+      {/* Track metadata */}
       <div className="flex w-72 shrink-0 items-center gap-3 overflow-hidden">
         <div
           className="relative h-11 w-11 shrink-0 rounded overflow-hidden bg-[#242424] border border-[#2e2e2e] cursor-pointer group"
@@ -150,6 +207,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
         </div>
       </div>
 
+      {/* Main playback controls */}
       <div className="flex flex-1 flex-col items-center gap-1">
         <div className="flex items-center gap-4">
           <button
@@ -222,11 +280,143 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
         </div>
       </div>
 
-      <div className="flex w-72 shrink-0 items-center justify-end gap-4">
+      {/* Audio FX, speed, sleep timer & volume controls */}
+      <div className="flex w-80 shrink-0 items-center justify-end gap-3 relative">
+        {/* Equalizer Popover */}
+        <div className="relative">
+          <button
+            onClick={() => {
+              setEqOpen(!eqOpen);
+              setSpeedOpen(false);
+              setTimerOpen(false);
+            }}
+            className={`p-1.5 rounded transition-colors ${
+              currentEq !== 'flat'
+                ? 'text-[#ff5500] bg-[#ff5500]/10'
+                : 'text-[#888888] hover:text-white hover:bg-[#222222]'
+            }`}
+            title="Equalizer & Bass Boost"
+          >
+            <SlidersHorizontal size={16} />
+          </button>
+
+          {eqOpen && (
+            <div className="absolute bottom-11 right-0 w-48 rounded-lg border border-[#2e2e2e] bg-[#1a1a1a] p-2 shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
+              <p className="text-[11px] font-bold text-white mb-1.5 px-2">Equalizer Presets</p>
+              <div className="space-y-1">
+                {eqPresets.map((p) => {
+                  const Icon = p.icon;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => handleSelectEq(p.id)}
+                      className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors flex items-center justify-between ${
+                        currentEq === p.id
+                          ? 'bg-[#ff5500] text-white font-bold'
+                          : 'text-[#ccc] hover:bg-[#282828] hover:text-white'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Icon size={13} className={currentEq === p.id ? 'text-white' : 'text-[#888888]'} />
+                        {p.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Playback Speed Popover */}
+        <div className="relative">
+          <button
+            onClick={() => {
+              setSpeedOpen(!speedOpen);
+              setEqOpen(false);
+              setTimerOpen(false);
+            }}
+            className={`p-1.5 rounded transition-colors text-xs font-bold ${
+              speed !== 1.0
+                ? 'text-[#ff5500] bg-[#ff5500]/10'
+                : 'text-[#888888] hover:text-white hover:bg-[#222222]'
+            }`}
+            title={`Playback Speed: ${speed}x`}
+          >
+            <span className="flex items-center gap-0.5 font-mono text-[11px]">
+              <Gauge size={13} />
+              {speed}x
+            </span>
+          </button>
+
+          {speedOpen && (
+            <div className="absolute bottom-11 right-0 w-28 rounded-lg border border-[#2e2e2e] bg-[#1a1a1a] p-1.5 shadow-2xl z-50">
+              <p className="text-[10px] font-bold text-white mb-1 px-1.5 uppercase">Speed</p>
+              <div className="space-y-0.5">
+                {speeds.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => handleSelectSpeed(s)}
+                    className={`w-full text-left px-2 py-1 rounded text-xs font-mono transition-colors ${
+                      speed === s
+                        ? 'bg-[#ff5500] text-white font-bold'
+                        : 'text-[#ccc] hover:bg-[#282828] hover:text-white'
+                    }`}
+                  >
+                    {s}x
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Sleep Timer Popover */}
+        <div className="relative">
+          <button
+            onClick={() => {
+              setTimerOpen(!timerOpen);
+              setEqOpen(false);
+              setSpeedOpen(false);
+            }}
+            className={`p-1.5 rounded transition-colors ${
+              sleepTimerSeconds
+                ? 'text-emerald-400 bg-emerald-950/40'
+                : 'text-[#888888] hover:text-white hover:bg-[#222222]'
+            }`}
+            title={
+              sleepTimerSeconds
+                ? `Sleep Timer: ${Math.floor(sleepTimerSeconds / 60)}m left`
+                : 'Sleep Timer'
+            }
+          >
+            <Clock size={16} />
+          </button>
+
+          {timerOpen && (
+            <div className="absolute bottom-11 right-0 w-36 rounded-lg border border-[#2e2e2e] bg-[#1a1a1a] p-1.5 shadow-2xl z-50">
+              <p className="text-[10px] font-bold text-white mb-1 px-1.5 uppercase">Sleep Timer</p>
+              <div className="space-y-0.5">
+                {timers.map((t, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleSelectTimer(t.val)}
+                    className="w-full text-left px-2 py-1.5 rounded text-xs text-[#ccc] hover:bg-[#282828] hover:text-white transition-colors"
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Volume Slider */}
         <div className="flex items-center gap-2 group">
           <button
-            onClick={() => onVolume(volume === 0 ? 80 : 0)}
+            onClick={handleToggleMute}
             className="text-[#888888] hover:text-white transition-colors"
+            title={volume === 0 ? 'Unmute' : 'Mute'}
           >
             {volume === 0 ? <VolumeX size={17} /> : <Volume2 size={17} />}
           </button>
@@ -236,13 +426,14 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             max={100}
             value={volume}
             onChange={(e) => onVolume(Number(e.target.value))}
-            className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-[#333333] accent-[#ff5500]"
+            className="h-1 w-16 cursor-pointer appearance-none rounded-full bg-[#333333] accent-[#ff5500]"
             style={{
               background: `linear-gradient(to right, #ff5500 ${volume}%, #333333 ${volume}%)`,
             }}
           />
         </div>
 
+        {/* Queue panel button */}
         {onToggleQueue && (
           <button
             onClick={onToggleQueue}

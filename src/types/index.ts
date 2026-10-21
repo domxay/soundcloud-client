@@ -11,6 +11,7 @@ export interface Track {
   waveform?: number[];
   waveform_url?: string;
   streamUrl?: string;
+  track_authorization?: string;
   media?: {
     transcodings: Array<{
       url: string;
@@ -26,7 +27,7 @@ export interface Track {
 }
 
 export interface Playlist {
-  id: number;
+  id: number | string;
   title: string;
   artist: string;
   artwork: string;

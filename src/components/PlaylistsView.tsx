@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Playlist, Track } from '@/types';
 import { soundcloudApi } from '@/services/api';
 import { Play, ListMusic, Sparkles, Loader2, RefreshCw } from 'lucide-react';
@@ -51,27 +51,123 @@ export default function PlaylistsView({
     return () => clearInterval(interval);
   }, []);
 
-  const filteredPlaylists = playlists.filter((p) => {
-    if (activeCategory === 'All') return true;
-    const title = p.title.toLowerCase();
-    const artist = p.artist.toLowerCase();
-    if (activeCategory === 'Electronic') {
-      return title.includes('electro') || title.includes('techno') || title.includes('edm') || title.includes('dance') || title.includes('phonk') || artist.includes('electronic');
-    }
-    if (activeCategory === 'Hip-Hop') {
-      return title.includes('hip') || title.includes('rap') || title.includes('trap') || title.includes('plugg');
-    }
-    if (activeCategory === 'Indie & Pop') {
-      return title.includes('indie') || title.includes('pop') || title.includes('dreams');
-    }
-    if (activeCategory === 'Rock') {
-      return title.includes('rock') || title.includes('metal') || title.includes('punk');
-    }
-    if (activeCategory === 'Curated') {
-      return title.includes('buzzing') || title.includes('curated') || artist.includes('curated') || artist.includes('new');
-    }
-    return true;
-  });
+  const deduplicatedPlaylists = useMemo(() => {
+    const seenIds = new Set<string | number>();
+    const seenTitles = new Set<string>();
+
+    return playlists.filter((p) => {
+      if (!p || !p.title) return false;
+      const lower = p.title.trim().toLowerCase();
+
+      // Exclude automated track radio stations
+      if (
+        lower.startsWith('related tracks:') ||
+        lower.startsWith('station:') ||
+        lower.startsWith('stations based on') ||
+        String(p.id).includes('track-station')
+      ) {
+        return false;
+      }
+
+      if (seenIds.has(p.id)) return false;
+
+      const norm = lower
+        .replace(/^(full\s+playlist|playlist\s*:?)/i, '')
+        .replace(/[^a-z0-9а-яё]/gi, '')
+        .trim();
+
+      if (norm && seenTitles.has(norm)) return false;
+
+      seenIds.add(p.id);
+      if (norm) seenTitles.add(norm);
+      return true;
+    });
+  }, [playlists]);
+
+  const filteredPlaylists = useMemo(() => {
+    return deduplicatedPlaylists.filter((p) => {
+      if (activeCategory === 'All') return true;
+      const title = p.title.toLowerCase();
+      const artist = (p.artist || '').toLowerCase();
+
+      if (activeCategory === 'Electronic') {
+        return (
+          title.includes('electro') ||
+          title.includes('techno') ||
+          title.includes('edm') ||
+          title.includes('dance') ||
+          title.includes('phonk') ||
+          title.includes('hardtekk') ||
+          title.includes('dubstep') ||
+          title.includes('house') ||
+          title.includes('breakbeat') ||
+          title.includes('drum & bass') ||
+          title.includes('synthwave') ||
+          title.includes('ambient') ||
+          artist.includes('electronic') ||
+          artist.includes('dance') ||
+          artist.includes('edm')
+        );
+      }
+      if (activeCategory === 'Hip-Hop') {
+        return (
+          title.includes('hip') ||
+          title.includes('rap') ||
+          title.includes('trap') ||
+          title.includes('plugg') ||
+          title.includes('bars') ||
+          title.includes('r&b') ||
+          title.includes('hustle') ||
+          artist.includes('rap') ||
+          artist.includes('hip-hop') ||
+          artist.includes('hustle')
+        );
+      }
+      if (activeCategory === 'Indie & Pop') {
+        return (
+          title.includes('indie') ||
+          title.includes('pop') ||
+          title.includes('dreams') ||
+          title.includes('scenes') ||
+          title.includes('fresco') ||
+          title.includes('latin') ||
+          title.includes('chill') ||
+          title.includes('acoustic') ||
+          artist.includes('indie') ||
+          artist.includes('pop') ||
+          artist.includes('scenes')
+        );
+      }
+      if (activeCategory === 'Rock') {
+        return (
+          title.includes('rock') ||
+          title.includes('metal') ||
+          title.includes('punk') ||
+          title.includes('alternative') ||
+          title.includes('industrial') ||
+          artist.includes('rock') ||
+          artist.includes('metal')
+        );
+      }
+      if (activeCategory === 'Curated') {
+        return (
+          title.includes('buzzing') ||
+          title.includes('curated') ||
+          title.includes('your mix') ||
+          title.includes('selected by') ||
+          title.includes('picks') ||
+          title.includes('lookout') ||
+          title.includes('weekly') ||
+          title.includes('top') ||
+          title.includes('hits') ||
+          artist.includes('soundcloud') ||
+          artist.includes('curated') ||
+          artist.includes('editorial')
+        );
+      }
+      return true;
+    });
+  }, [deduplicatedPlaylists, activeCategory]);
 
   const handleOpenPlaylist = async (p: Playlist) => {
     setSelectedPlaylist(p);
@@ -243,7 +339,7 @@ export default function PlaylistsView({
                   {p.title}
                 </h3>
                 <p className="text-[11px] text-sc-text-secondary truncate mt-0.5">
-                  {p.artist}
+                  {p.artist === 'New!' || !p.artist ? 'SoundCloud Editorial' : p.artist}
                 </p>
                 <div className="mt-2 flex items-center justify-between text-[10px] text-sc-text-secondary/80">
                   <span>{p.tracks.length > 0 ? `${p.tracks.length} tracks` : 'Full Playlist'}</span>

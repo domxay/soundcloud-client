@@ -214,7 +214,7 @@ export default function LibraryView({
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
               <Sparkles className="text-sc-accent" size={18} />
-              Real & Curated Playlists
+              Featured & Curated Playlists
             </h2>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">

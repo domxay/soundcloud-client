@@ -209,8 +209,8 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
           <div className="flex items-center gap-3">
             <Palette className="text-sc-accent" size={24} />
             <div>
-              <h2 className="text-base font-bold text-white">Appearance & Network Studio</h2>
-              <p className="text-xs text-sc-text-secondary">Custom themes, live backgrounds, and in-app bypass proxy</p>
+              <h2 className="text-base font-bold text-white">Appearance & Network Settings</h2>
+              <p className="text-xs text-sc-text-secondary">Custom themes, ambient backgrounds, and network configuration</p>
             </div>
           </div>
 
@@ -229,7 +229,7 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
             }`}
           >
             <Palette size={15} />
-            Aesthetic Themes ({THEME_PRESETS.length})
+            Color Themes ({THEME_PRESETS.length})
           </button>
           <button
             onClick={() => setActiveTab('background')}
@@ -251,7 +251,7 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
             }`}
           >
             <Globe size={15} />
-            Bypass / Network (Без VPN)
+            Network & Proxy Routing
           </button>
         </div>
 
@@ -299,7 +299,7 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
               <div className="flex items-center justify-between pb-3 border-b border-sc-border">
                 <div>
                   <h4 className="text-sm font-bold text-white">Background Media</h4>
-                  <p className="text-xs text-sc-text-secondary mt-0.5">Select a PC file (GIF, MP4, photo) or choose an aesthetic preset</p>
+                  <p className="text-xs text-sc-text-secondary mt-0.5">Select a local media file (GIF, MP4, photo) or choose a preset</p>
                 </div>
                 {bgConfig.type !== 'none' && (
                   <button
@@ -312,7 +312,7 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-white mb-2">Aesthetic Presets (Tokyo Red, Cyberpunk, Synthwave)</label>
+                <label className="block text-xs font-semibold text-white mb-2">Preset Gallery (Tokyo Red, Cyberpunk, Synthwave)</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {BACKGROUND_PRESETS.map((p, idx) => (
                     <div

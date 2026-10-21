@@ -12,6 +12,9 @@ import {
   LogOut,
   Upload,
   Settings,
+  ShieldCheck,
+  ShieldAlert,
+  RefreshCw,
 } from 'lucide-react';
 import { authService } from '@/services/auth';
 
@@ -26,9 +29,30 @@ export default function Header({
 }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
+  const [proxyInfo, setProxyInfo] = useState<{ active: boolean; name: string } | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   const navigate = useNavigate();
   const isAuth = authService.isAuthenticated();
   const session = authService.getSession();
+
+  useEffect(() => {
+    // Check proxy status
+    const updateProxyStatus = async () => {
+      if ((window as any).electronAPI?.detectLocalProxy) {
+        try {
+          const res = await (window as any).electronAPI.detectLocalProxy();
+          if (res && res.success) {
+            setProxyInfo({ active: true, name: res.name || 'Clash/VPN' });
+          } else {
+            setProxyInfo({ active: false, name: 'System / Direct' });
+          }
+        } catch {
+          setProxyInfo({ active: false, name: 'Direct' });
+        }
+      }
+    };
+    updateProxyStatus();
+  }, []);
 
   useEffect(() => {
     if (!dropdownOpen) return;
@@ -56,6 +80,20 @@ export default function Header({
 
   const handleUploadClick = () => {
     window.open('https://soundcloud.com/upload', '_blank');
+  };
+
+  const handleQuickSync = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await authService.syncSessionFromCookies();
+      if (res.success) {
+        window.location.reload();
+      } else {
+        onOpenLogin();
+      }
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleMinimize = () => {
@@ -147,9 +185,28 @@ export default function Header({
         className="flex items-center gap-2 ml-auto shrink-0"
         style={{ WebkitAppRegion: 'no-drag' } as any}
       >
+        {proxyInfo && (
+          <button
+            onClick={() => navigate('/settings')}
+            className={`hidden md:flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-all border ${
+              proxyInfo.active
+                ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/60 hover:bg-emerald-900/40'
+                : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white'
+            }`}
+            title="VPN & Proxy Route Status — Click to configure"
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${
+                proxyInfo.active ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'
+              }`}
+            />
+            <span className="truncate max-w-[130px]">{proxyInfo.name}</span>
+          </button>
+        )}
+
         <button
           onClick={handleUploadClick}
-          className="hidden md:flex items-center gap-1 text-xs font-medium text-[#999999] hover:text-white px-2 py-1 rounded transition-colors"
+          className="hidden lg:flex items-center gap-1 text-xs font-medium text-[#999999] hover:text-white px-2 py-1 rounded transition-colors"
           title="Upload to SoundCloud"
         >
           <Upload size={14} />
@@ -165,7 +222,7 @@ export default function Header({
             }
           }}
           className="flex items-center gap-1 rounded border border-[#282828] bg-[#1a1a1a] px-2.5 py-1 text-xs font-semibold text-white hover:border-[#ff5500] hover:text-[#ff5500] transition-all shadow-sm"
-          title="Studio Settings & Themes"
+          title="Application Settings & Themes"
         >
           <Sliders size={13} className="text-[#ff5500]" />
           <span className="hidden sm:inline">Settings</span>
@@ -173,7 +230,7 @@ export default function Header({
 
         <button
           onClick={handleOpenTelegram}
-          className="hidden lg:flex items-center gap-1.5 rounded border border-[#229ED9]/40 bg-[#229ED9]/10 px-2.5 py-1 text-xs font-semibold text-[#229ED9] hover:bg-[#229ED9] hover:text-white transition-all shadow-sm"
+          className="hidden xl:flex items-center gap-1.5 rounded border border-[#229ED9]/40 bg-[#229ED9]/10 px-2.5 py-1 text-xs font-semibold text-[#229ED9] hover:bg-[#229ED9] hover:text-white transition-all shadow-sm"
           title="Author Telegram Channel"
         >
           <Send size={12} className="rotate-[-20deg]" />
@@ -246,12 +303,23 @@ export default function Header({
             )}
           </div>
         ) : (
-          <button
-            onClick={onOpenLogin}
-            className="rounded bg-[#ff5500] px-3.5 py-1.5 text-xs font-bold text-white hover:bg-[#ff6600] active:bg-[#e64d00] transition-colors shadow-sm"
-          >
-            Sign In
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleQuickSync}
+              disabled={isSyncing}
+              className="hidden sm:flex items-center gap-1 rounded border border-[#333] bg-[#1a1a1a] px-2.5 py-1.5 text-xs font-semibold text-[#ccc] hover:text-white hover:border-[#ff5500] transition-colors"
+              title="1-Click Auto-Sync Session from browser cookies"
+            >
+              <RefreshCw size={12} className={isSyncing ? 'animate-spin text-[#ff5500]' : ''} />
+              <span>Auto-Sync</span>
+            </button>
+            <button
+              onClick={onOpenLogin}
+              className="rounded bg-[#ff5500] px-3.5 py-1.5 text-xs font-bold text-white hover:bg-[#ff6600] active:bg-[#e64d00] transition-colors shadow-sm"
+            >
+              Sign In
+            </button>
+          </div>
         )}
       </div>
 
