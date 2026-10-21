@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { themeService, THEME_PRESETS, BACKGROUND_PRESETS, CustomBackground } from '@/services/theme';
-import { X, Palette, Image as ImageIcon, Video, Check, Upload, Sliders, Sparkles, Shield, Globe, CheckCircle2, RefreshCw } from 'lucide-react';
+import { ALL_WALLPAPERS, WallpaperItem } from '@/data/wallpapers';
+import { X, Palette, Image as ImageIcon, Video, Check, Upload, Sliders, Sparkles, Shield, Globe, CheckCircle2, RefreshCw, Search, Film } from 'lucide-react';
 
 interface ThemeSettingsModalProps {
   isOpen: boolean;
@@ -22,6 +23,23 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
   const [builtinProxyEnabled, setBuiltinProxyEnabled] = useState(false);
   const [builtinProxyPort, setBuiltinProxyPort] = useState(8899);
   const [builtinProxyStatus, setBuiltinProxyStatus] = useState<string | null>(null);
+  const [wallpaperFilter, setWallpaperFilter] = useState<'all' | 'live' | 'static'>('all');
+  const [wallpaperGenre, setWallpaperGenre] = useState<string>('All');
+  const [wallpaperSearch, setWallpaperSearch] = useState('');
+  const [hoveredVideoId, setHoveredVideoId] = useState<string | null>(null);
+
+  const filteredWallpapers = useMemo(() => {
+    return ALL_WALLPAPERS.filter((w) => {
+      if (wallpaperFilter === 'live' && w.type !== 'video') return false;
+      if (wallpaperFilter === 'static' && w.type !== 'image') return false;
+      if (wallpaperGenre !== 'All' && w.category !== wallpaperGenre) return false;
+      if (wallpaperSearch.trim()) {
+        const q = wallpaperSearch.toLowerCase();
+        return w.name.toLowerCase().includes(q) || w.category.toLowerCase().includes(q);
+      }
+      return true;
+    });
+  }, [wallpaperFilter, wallpaperGenre, wallpaperSearch]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -98,14 +116,19 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
 
   const handleNativeFileSelect = async () => {
     if (window.electronAPI?.selectBackgroundFile) {
-      const result = await window.electronAPI.selectBackgroundFile();
-      if (result) {
-        const updated: CustomBackground = {
-          ...bgConfig,
-          type: result.type,
-          url: result.url,
-        };
-        handleApplyBackground(updated);
+      try {
+        const result = await window.electronAPI.selectBackgroundFile();
+        if (result && result.url) {
+          const updated: CustomBackground = {
+            ...bgConfig,
+            type: result.type,
+            url: result.url,
+          };
+          setCustomUrl(result.url);
+          handleApplyBackground(updated);
+        }
+      } catch (err) {
+        console.error('Failed to select local background file:', err);
       }
     }
   };
@@ -113,29 +136,37 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
   const handleBrowserFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const isVideo = file.type.startsWith('video');
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          const updated: CustomBackground = {
-            ...bgConfig,
-            type: isVideo ? 'video' : 'image',
-            url: reader.result,
-          };
-          handleApplyBackground(updated);
-        }
+      const isVideo = file.type.startsWith('video') || /\.(mp4|webm|m4v|mov|mkv)$/i.test(file.name);
+      const objectUrl = URL.createObjectURL(file);
+      const updated: CustomBackground = {
+        ...bgConfig,
+        type: isVideo ? 'video' : 'image',
+        url: objectUrl,
       };
-      reader.readAsDataURL(file);
+      setCustomUrl(objectUrl);
+      handleApplyBackground(updated);
     }
   };
 
   const handleUrlApply = () => {
-    if (!customUrl.trim()) return;
-    const isVideo = customUrl.endsWith('.mp4') || customUrl.endsWith('.webm');
+    const raw = customUrl.trim();
+    if (!raw) return;
+    let finalUrl = raw;
+    if (/^[a-zA-Z]:[\\/]/.test(raw)) {
+      finalUrl = `local-media://${encodeURI(raw.replace(/\\/g, '/'))}`;
+    } else if (raw.startsWith('file:///')) {
+      const pathPart = raw.replace(/^file:\/\/\//, '');
+      finalUrl = `local-media://${pathPart}`;
+    }
+
+    const isVideo =
+      /\.(mp4|webm|m4v|mov|mkv)(\?.*)?$/i.test(raw) ||
+      /\.(mp4|webm|m4v|mov|mkv)(\?.*)?$/i.test(finalUrl);
+
     const updated: CustomBackground = {
       ...bgConfig,
       type: isVideo ? 'video' : 'image',
-      url: customUrl.trim(),
+      url: finalUrl,
     };
     handleApplyBackground(updated);
   };
@@ -311,21 +342,208 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                 )}
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-white mb-2">Preset Gallery (Tokyo Red, Cyberpunk, Synthwave)</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {BACKGROUND_PRESETS.map((p, idx) => (
-                    <div
-                      key={idx}
-                      onClick={() => handleApplyBackground({ ...bgConfig, type: p.type, url: p.url })}
-                      className="group cursor-pointer rounded-sc border border-sc-border overflow-hidden relative aspect-video transition-all hover:border-sc-accent hover:scale-[1.03]"
-                    >
-                      <img src={p.url} alt={p.name} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/55 p-2 flex flex-col justify-end">
-                        <span className="text-[10px] font-bold text-white leading-tight">{p.name}</span>
-                      </div>
+              {/* Active Wallpaper Preview Banner */}
+              {bgConfig.type !== 'none' && bgConfig.url && (
+                <div className="rounded-sc border border-sc-border bg-[#161616] p-3 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative w-16 h-10 rounded overflow-hidden border border-sc-border shrink-0 bg-black">
+                      {bgConfig.type === 'video' ? (
+                        <video
+                          key={bgConfig.url}
+                          src={
+                            bgConfig.url.startsWith('file:///')
+                              ? `local-media://${bgConfig.url.replace(/^file:\/\/\//, '')}`
+                              : /^[a-zA-Z]:[\\/]/.test(bgConfig.url)
+                              ? `local-media://${encodeURI(bgConfig.url.replace(/\\/g, '/'))}`
+                              : bgConfig.url
+                          }
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                          preload="auto"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <img
+                          src={
+                            bgConfig.url.startsWith('file:///')
+                              ? `local-media://${bgConfig.url.replace(/^file:\/\/\//, '')}`
+                              : /^[a-zA-Z]:[\\/]/.test(bgConfig.url)
+                              ? `local-media://${encodeURI(bgConfig.url.replace(/\\/g, '/'))}`
+                              : bgConfig.url
+                          }
+                          alt="Current wallpaper"
+                          className="w-full h-full object-cover"
+                        />
+                      )}
                     </div>
-                  ))}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-white truncate">Active Background</span>
+                        <span className="px-1.5 py-0.5 text-[9px] font-extrabold rounded uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          {bgConfig.type === 'video' ? 'MP4 LIVE' : 'IMAGE'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-sc-text-secondary truncate max-w-sm mt-0.5">
+                        {bgConfig.url}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleRemoveBackground}
+                    className="text-xs text-red-400 hover:text-red-300 font-semibold shrink-0 px-2.5 py-1 rounded hover:bg-red-500/10 transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+
+              {/* Curated Wallpaper Library (100 Wallpapers) */}
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-white uppercase tracking-wider">
+                      Wallpaper Library (100 Curated Themes)
+                    </label>
+                    <p className="text-[11px] text-sc-text-secondary mt-0.5">
+                      50 live looped videos &bull; 50 ultra-HD static backgrounds
+                    </p>
+                  </div>
+
+                  {/* Filter Mode: All / Live / Static */}
+                  <div className="flex items-center gap-1 bg-[#1a1a1a] p-1 rounded-sc border border-sc-border self-start sm:self-auto">
+                    <button
+                      onClick={() => setWallpaperFilter('all')}
+                      className={`px-2.5 py-1 text-[11px] font-semibold rounded-sc transition-colors ${
+                        wallpaperFilter === 'all'
+                          ? 'bg-sc-accent text-white shadow-sm'
+                          : 'text-sc-text-secondary hover:text-white'
+                      }`}
+                    >
+                      All (100)
+                    </button>
+                    <button
+                      onClick={() => setWallpaperFilter('live')}
+                      className={`px-2.5 py-1 text-[11px] font-semibold rounded-sc transition-colors flex items-center gap-1 ${
+                        wallpaperFilter === 'live'
+                          ? 'bg-sc-accent text-white shadow-sm'
+                          : 'text-sc-text-secondary hover:text-white'
+                      }`}
+                    >
+                      <Film size={11} />
+                      Live (50)
+                    </button>
+                    <button
+                      onClick={() => setWallpaperFilter('static')}
+                      className={`px-2.5 py-1 text-[11px] font-semibold rounded-sc transition-colors flex items-center gap-1 ${
+                        wallpaperFilter === 'static'
+                          ? 'bg-sc-accent text-white shadow-sm'
+                          : 'text-sc-text-secondary hover:text-white'
+                      }`}
+                    >
+                      <ImageIcon size={11} />
+                      Static (50)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Search & Genre tags */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sc-text-secondary" />
+                    <input
+                      type="text"
+                      value={wallpaperSearch}
+                      onChange={(e) => setWallpaperSearch(e.target.value)}
+                      placeholder="Search wallpapers by title, genre, artist..."
+                      className="w-full rounded-sc border border-sc-border bg-[#161616] py-1.5 pl-8 pr-3 text-xs text-white placeholder:text-sc-text-secondary/60 focus:border-sc-accent focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
+                    {['All', 'Cyberpunk', 'Anime & Lo-Fi', 'Synthwave', 'Dark & Minimal', 'Cosmic & Space', 'Nature'].map((g) => (
+                      <button
+                        key={g}
+                        onClick={() => setWallpaperGenre(g)}
+                        className={`px-2.5 py-1 text-[10px] font-bold rounded-sc whitespace-nowrap transition-colors ${
+                          wallpaperGenre === g
+                            ? 'bg-sc-accent text-white'
+                            : 'bg-[#181818] border border-sc-border text-sc-text-secondary hover:text-white hover:border-sc-accent/50'
+                        }`}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Wallpapers Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[360px] overflow-y-auto pr-1">
+                  {filteredWallpapers.map((w) => {
+                    const isSelected = bgConfig.url === w.url;
+                    const isHovered = hoveredVideoId === w.id;
+
+                    return (
+                      <div
+                        key={w.id}
+                        onClick={() => handleApplyBackground({ ...bgConfig, type: w.type, url: w.url })}
+                        onMouseEnter={() => setHoveredVideoId(w.id)}
+                        onMouseLeave={() => setHoveredVideoId(null)}
+                        className={`group cursor-pointer rounded-sc border overflow-hidden relative aspect-video transition-all hover:scale-[1.02] shadow-md ${
+                          isSelected
+                            ? 'border-sc-accent ring-2 ring-sc-accent shadow-sc-accent/25'
+                            : 'border-sc-border hover:border-sc-accent/60'
+                        }`}
+                      >
+                        <img
+                          src={w.thumbnail}
+                          alt={w.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          loading="lazy"
+                        />
+                        {w.type === 'video' && isHovered && (
+                          <video
+                            src={w.url}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="absolute inset-0 w-full h-full object-cover z-0"
+                          />
+                        )}
+
+                        {/* Top Badges */}
+                        <div className="absolute top-1.5 left-1.5 right-1.5 flex items-center justify-between pointer-events-none">
+                          <span
+                            className={`px-1.5 py-0.5 text-[9px] font-extrabold rounded uppercase tracking-wider ${
+                              w.type === 'video'
+                                ? 'bg-emerald-500/90 text-white shadow-sm'
+                                : 'bg-black/70 text-zinc-300 border border-white/10'
+                            }`}
+                          >
+                            {w.type === 'video' ? 'LIVE' : '4K'}
+                          </span>
+
+                          {isSelected && (
+                            <span className="h-5 w-5 rounded-full bg-sc-accent text-white flex items-center justify-center shadow-md">
+                              <Check size={12} />
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Bottom Overlay Title */}
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-2 flex flex-col justify-end pointer-events-none">
+                          <span className="text-[11px] font-bold text-white leading-tight truncate">
+                            {w.name}
+                          </span>
+                          <span className="text-[9px] text-sc-text-secondary/90 truncate mt-0.5">
+                            {w.category} &bull; {w.author || 'Pinterest'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

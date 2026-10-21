@@ -125,6 +125,7 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
               isPlaying={isPlaying && currentTrack?.id === track.id}
               onPlay={() => onPlayTrack(track, tracks)}
               onLike={() => onLikeTrack(track)}
+              onArtistClick={(artist) => navigate(`/artist/${encodeURIComponent(artist)}`)}
             />
           ))}
         </div>

@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { Play, Pause, Heart, Download, MoreHorizontal, Loader2, MessageSquare } from 'lucide-react';
 import { Track } from '@/types';
 import { formatTime, formatRelativeTime } from '@/services/utils';
@@ -24,6 +25,7 @@ export default function TrackList({
   onDownload,
   onOpenComments,
 }: TrackListProps) {
+  const navigate = useNavigate();
   return (
     <div className="px-8 pb-32">
       <div className="grid grid-cols-[28px_1fr_180px_80px_60px_140px_30px] items-center gap-4 border-b border-sc-border pb-2 text-xs font-semibold uppercase tracking-wider text-sc-text-secondary select-none">
@@ -116,7 +118,14 @@ export default function TrackList({
                 </div>
               </div>
 
-              <span className="truncate text-sm text-sc-text-secondary hover:text-white hover:underline cursor-pointer">
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/artist/${encodeURIComponent(track.artist)}`);
+                }}
+                className="truncate text-sm text-sc-text-secondary hover:text-white hover:underline cursor-pointer"
+                title={`View ${track.artist}'s profile & discography`}
+              >
                 {track.artist}
               </span>
 

@@ -1,9 +1,28 @@
-const { app, BrowserWindow, ipcMain, shell, dialog, session, net } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, session, net, protocol } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
 const http = require('http');
 const netSocket = require('net');
+const { pathToFileURL } = require('url');
+
+// Register custom privileged scheme for streaming local MP4/WebM videos and images
+try {
+  protocol.registerSchemesAsPrivileged([
+    {
+      scheme: 'local-media',
+      privileges: {
+        standard: true,
+        secure: true,
+        bypassCSP: true,
+        allowServiceWorkers: true,
+        supportFetchAPI: true,
+        corsEnabled: true,
+        stream: true,
+      },
+    },
+  ]);
+} catch {}
 
 let mainWindow = null;
 let currentProxyRule = null;
@@ -426,8 +445,8 @@ ipcMain.handle('sc:select-background-file', async () => {
     properties: ['openFile'],
     filters: [
       {
-        name: 'Media Files (*.gif, *.mp4, *.webm, *.png, *.jpg, *.jpeg, *.webp)',
-        extensions: ['gif', 'mp4', 'webm', 'png', 'jpg', 'jpeg', 'webp'],
+        name: 'Media Files (*.gif, *.mp4, *.webm, *.m4v, *.mov, *.png, *.jpg, *.jpeg, *.webp)',
+        extensions: ['gif', 'mp4', 'webm', 'm4v', 'mov', 'png', 'jpg', 'jpeg', 'webp'],
       },
       { name: 'All Files (*.*)', extensions: ['*'] },
     ],
@@ -437,10 +456,11 @@ ipcMain.handle('sc:select-background-file', async () => {
   }
   const filePath = result.filePaths[0];
   const normalized = filePath.replace(/\\/g, '/');
-  const isVideo = normalized.endsWith('.mp4') || normalized.endsWith('.webm');
+  const isVideo = /\.(mp4|webm|m4v|mov|mkv)$/i.test(normalized);
   return {
-    url: `file:///${normalized}`,
+    url: `local-media://${encodeURI(normalized)}`,
     type: isVideo ? 'video' : 'image',
+    fileName: path.basename(filePath),
   };
 });
 
@@ -705,6 +725,29 @@ ipcMain.handle('sc:relaunch-app', () => {
 });
 
 app.whenReady().then(async () => {
+  // Handle local-media:// protocol with range-request streaming for HTML5 <video> and <img>
+  try {
+    protocol.handle('local-media', (request) => {
+      try {
+        let raw = request.url.replace(/^local-media:\/+/i, '');
+        let decoded = decodeURIComponent(raw);
+        if (process.platform === 'win32' && /^\/[a-zA-Z]:/.test(decoded)) {
+          decoded = decoded.slice(1);
+        }
+        const targetPath = path.resolve(decoded);
+        if (!fs.existsSync(targetPath)) {
+          return new Response('File not found', { status: 404 });
+        }
+        const fileUrl = pathToFileURL(targetPath).toString();
+        return net.fetch(fileUrl);
+      } catch (err) {
+        return new Response('Media streaming error: ' + err.message, { status: 500 });
+      }
+    });
+  } catch (e) {
+    console.error('Failed to register local-media handler:', e);
+  }
+
   createWindow();
 
   // Try loading saved client ID

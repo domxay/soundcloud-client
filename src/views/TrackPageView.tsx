@@ -146,7 +146,10 @@ export const TrackPageView: React.FC<TrackPageViewProps> = ({
                   <h1 className="text-2xl font-bold text-white tracking-tight leading-tight">
                     {track.title}
                   </h1>
-                  <p className="text-sm text-[#aaaaaa] font-medium hover:text-white cursor-pointer hover:underline mt-0.5">
+                  <p
+                    onClick={() => navigate(`/artist/${encodeURIComponent(track.artist)}`)}
+                    className="text-sm text-[#aaaaaa] font-medium hover:text-white cursor-pointer hover:underline mt-0.5"
+                  >
                     {track.artist}
                   </p>
                 </div>

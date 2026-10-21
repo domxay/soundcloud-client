@@ -8,6 +8,19 @@ export interface Track {
   liked: boolean;
   created_at?: string;
   display_date?: string;
+  description?: string;
+  genre?: string;
+  tag_list?: string;
+  permalink_url?: string;
+  artistId?: number;
+  user?: {
+    id: number;
+    username: string;
+    avatar_url: string;
+    permalink_url?: string;
+    city?: string;
+    country_code?: string;
+  };
   waveform?: number[];
   waveform_url?: string;
   streamUrl?: string;
@@ -41,6 +54,7 @@ export interface UserProfile {
   id: number;
   username: string;
   avatar_url: string;
+  header_image_url?: string;
   city?: string;
   country_code?: string;
   followers_count?: number;
@@ -49,6 +63,7 @@ export interface UserProfile {
   playlist_count?: number;
   permalink_url?: string;
   description?: string;
+  verified?: boolean;
 }
 
 export interface Comment {

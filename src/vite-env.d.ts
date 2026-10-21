@@ -27,7 +27,7 @@ interface Window {
     closeWindow: () => Promise<void>;
     selectSaveFile: (defaultName: string) => Promise<string | null>;
     selectDownloadFolder: () => Promise<string | null>;
-    selectBackgroundFile: () => Promise<{ url: string; type: 'video' | 'image' } | null>;
+    selectBackgroundFile: () => Promise<{ url: string; type: 'video' | 'image'; fileName?: string } | null>;
     setProxy: (rule: string | null) => Promise<{ success: boolean; proxy?: string | null; error?: string }>;
     testProxy?: (rule: string | null) => Promise<{ success: boolean; latency?: number; status?: number; error?: string }>;
     detectLocalProxy?: () => Promise<{ success: boolean; proxy?: string; name?: string; candidates?: any[] }>;

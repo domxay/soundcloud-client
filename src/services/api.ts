@@ -864,10 +864,121 @@ export class SoundCloudApi {
       liked: Boolean(raw.user_favorite),
       created_at: raw.created_at || raw.display_date || undefined,
       display_date: raw.display_date || raw.created_at || undefined,
+      description: raw.description,
+      genre: raw.genre,
+      tag_list: raw.tag_list,
+      permalink_url: raw.permalink_url,
+      artistId: raw.user?.id,
+      user: raw.user
+        ? {
+            id: raw.user.id,
+            username: raw.user.username,
+            avatar_url: raw.user.avatar_url,
+            permalink_url: raw.user.permalink_url,
+            city: raw.user.city,
+            country_code: raw.user.country_code,
+          }
+        : undefined,
       waveform_url: raw.waveform_url,
       media: raw.media,
       track_authorization: raw.track_authorization,
     };
+  }
+
+  public async getArtistById(userId: number | string): Promise<UserProfile | null> {
+    try {
+      const res = await this.fetchWithRetry(this.buildUrl(`/users/${userId}`));
+      if (!res.ok) return null;
+      const data = await res.json();
+      return {
+        id: data.id,
+        username: data.username,
+        avatar_url: data.avatar_url ? data.avatar_url.replace('-large', '-t500x500') : '',
+        header_image_url: data.visuals?.visuals?.[0]?.visual_url || '',
+        city: data.city,
+        country_code: data.country_code,
+        followers_count: data.followers_count,
+        followings_count: data.followings_count,
+        track_count: data.track_count,
+        playlist_count: data.playlist_count,
+        permalink_url: data.permalink_url,
+        description: data.description,
+        verified: Boolean(data.verified || data.badges?.pro_unlimited || data.badges?.verified),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  public async getArtistByName(artistName: string): Promise<UserProfile | null> {
+    const trimmed = artistName.trim();
+    if (!trimmed) return null;
+
+    try {
+      const res = await this.fetchWithRetry(this.buildUrl('/search/users', { q: trimmed, limit: 5 }));
+      if (!res.ok) return null;
+      const data = await res.json();
+      const collection = data.collection || [];
+      if (collection.length === 0) return null;
+
+      // Find exact match or best candidate
+      const exact = collection.find(
+        (u: any) => u.username?.toLowerCase() === trimmed.toLowerCase()
+      ) || collection[0];
+
+      return this.getArtistById(exact.id);
+    } catch {
+      return null;
+    }
+  }
+
+  public async getArtistTracks(userId: number | string, limit = 50): Promise<Track[]> {
+    try {
+      const res = await this.fetchWithRetry(this.buildUrl(`/users/${userId}/tracks`, { limit }));
+      if (!res.ok) return [];
+      const data = await res.json();
+      const collection = data.collection || [];
+      const localLikes = this.getLocalLikes();
+      const likedSet = new Set(localLikes.map((t) => t.id));
+
+      return collection.map((raw: any) => {
+        const t = this.mapRawTrack(raw);
+        if (likedSet.has(t.id)) t.liked = true;
+        this.registerTrack(t);
+        return t;
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  public async getArtistPlaylists(userId: number | string, limit = 20): Promise<Playlist[]> {
+    try {
+      const res = await this.fetchWithRetry(this.buildUrl(`/users/${userId}/playlists`, { limit }));
+      if (!res.ok) return [];
+      const data = await res.json();
+      const collection = data.collection || [];
+      const playlists: Playlist[] = [];
+
+      for (const item of collection) {
+        const p = item.playlist || item;
+        const resolvedTracks = await this.resolvePlaylistTracks(p.tracks || []);
+        const fallbackArtwork = resolvedTracks.length > 0 ? resolvedTracks[0].artwork : '';
+        playlists.push({
+          id: p.id,
+          title: p.title,
+          artist: p.user?.username || 'Artist',
+          artwork: p.artwork_url || fallbackArtwork || p.user?.avatar_url || '',
+          updatedDaysAgo: this.daysAgo(p.last_modified || p.created_at),
+          created_at: p.created_at,
+          updated_at: p.last_modified || p.updated_at,
+          tracks: resolvedTracks,
+        });
+      }
+      return playlists;
+    } catch {
+      return [];
+    }
   }
 }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import HomeView from '@/components/HomeView';
@@ -14,7 +14,7 @@ import PlaylistsView from '@/components/PlaylistsView';
 import CommentsModal from '@/components/CommentsModal';
 import LyricsModal from '@/components/LyricsModal';
 import ThemeSettingsModal from '@/components/ThemeSettingsModal';
-import { FeedView, SearchResultsView, SettingsView, TrackPageView } from '@/views';
+import { FeedView, SearchResultsView, SettingsView, TrackPageView, ArtistView } from '@/views';
 import { Track, Playlist, DownloadItem, UserProfile, Comment, ToastNotification } from '@/types';
 import { emptyPlaylist } from '@/data';
 import { audioService } from '@/services/audio';
@@ -310,23 +310,42 @@ function AppContent() {
     ? downloadingIds.has(currentTrack.id)
     : false;
 
+  const resolvedBgSrc = useMemo(() => {
+    if (!customBg.url) return '';
+    const raw = customBg.url.trim();
+    if (/^[a-zA-Z]:[\\/]/.test(raw)) {
+      return `local-media://${encodeURI(raw.replace(/\\/g, '/'))}`;
+    }
+    if (raw.startsWith('file:///')) {
+      const pathPart = raw.replace(/^file:\/\/\//, '');
+      return `local-media://${pathPart}`;
+    }
+    return raw;
+  }, [customBg.url]);
+
   return (
     <div className="min-h-screen bg-[#121212] text-white flex flex-col relative pb-20">
-      {customBg.type !== 'none' && customBg.url && (
+      {customBg.type !== 'none' && resolvedBgSrc && (
         <div className="sc-bg-layer">
           {customBg.type === 'video' ? (
             <video
-              src={customBg.url}
+              key={resolvedBgSrc}
+              src={resolvedBgSrc}
               autoPlay
               loop
               muted
               playsInline
+              preload="auto"
               className="w-full h-full object-cover"
               style={{ filter: `blur(${customBg.blur}px)` }}
+              onError={(e) => {
+                console.warn('Video background failed to load:', e);
+              }}
             />
           ) : (
             <img
-              src={customBg.url}
+              key={resolvedBgSrc}
+              src={resolvedBgSrc}
               alt="Custom background"
               className="w-full h-full object-cover"
               style={{ filter: `blur(${customBg.blur}px)` }}
@@ -432,6 +451,21 @@ function AppContent() {
             }
           />
           <Route
+            path="/artist/:query"
+            element={
+              <ArtistView
+                currentTrackId={currentTrack?.id ?? null}
+                isPlaying={isPlaying}
+                downloadingIds={downloadingIds}
+                onTrackPlay={(t, l) => handleTrackPlay(t, l)}
+                onLikeToggle={handleLikeToggle}
+                onDownload={handleDownload}
+                onSelectPlaylist={handleSelectPlaylist}
+                onOpenComments={handleOpenCommentsModal}
+              />
+            }
+          />
+          <Route
             path="/settings"
             element={<SettingsView onOpenLogin={() => setIsLoginModalOpen(true)} />}
           />
@@ -518,7 +552,7 @@ function AppContent() {
           onOpenComments={() => handleOpenCommentsModal()}
           onOpenLyrics={() => setIsLyricsOpen(true)}
           onTrackTitleClick={() => navigate(`/tracks/${currentTrack.id}`)}
-          onArtistClick={(artist) => navigate(`/search?q=${encodeURIComponent(artist)}`)}
+          onArtistClick={(artist) => navigate(`/artist/${encodeURIComponent(artist)}`)}
         />
       )}
 
