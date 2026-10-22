@@ -28,6 +28,7 @@ export class AudioService {
   // Sleep Timer
   private sleepTimerId: any = null;
   private sleepTimerEndsAt: number | null = null;
+  private progressInterval: any = null;
 
   // Web Audio Equalizer
   private audioContext: AudioContext | null = null;
@@ -133,17 +134,35 @@ export class AudioService {
     return this.currentEqPreset;
   }
 
+  private startProgressTicker(): void {
+    this.stopProgressTicker();
+    this.progressInterval = setInterval(() => {
+      if (this.isPlaying) {
+        this.notify();
+      }
+    }, 50);
+  }
+
+  private stopProgressTicker(): void {
+    if (this.progressInterval) {
+      clearInterval(this.progressInterval);
+      this.progressInterval = null;
+    }
+  }
+
   private setupListeners(): void {
     this.audio.addEventListener('play', () => {
       this.isPlaying = true;
       if (this.audioContext && this.audioContext.state === 'suspended') {
         this.audioContext.resume().catch(() => {});
       }
+      this.startProgressTicker();
       this.notify();
     });
 
     this.audio.addEventListener('pause', () => {
       this.isPlaying = false;
+      this.stopProgressTicker();
       this.notify();
     });
 
@@ -153,6 +172,7 @@ export class AudioService {
 
     this.audio.addEventListener('ended', () => {
       this.isPlaying = false;
+      this.stopProgressTicker();
       this.notify();
       if (this.repeatMode) {
         this.audio.currentTime = 0;

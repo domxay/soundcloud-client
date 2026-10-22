@@ -23,8 +23,25 @@ export default function LyricsModal({
   const [activeTab, setActiveTab] = useState<'lyrics' | 'description' | 'editor'>('lyrics');
   const [customText, setCustomText] = useState('');
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [syncOffset, setSyncOffset] = useState<number>(() => {
+    const saved = localStorage.getItem('sc_lyrics_sync_offset');
+    return saved !== null ? Number(saved) : 0.45;
+  });
   const activeLineRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleAdjustOffset = (delta: number) => {
+    setSyncOffset((prev) => {
+      const next = Math.round((prev + delta) * 100) / 100;
+      localStorage.setItem('sc_lyrics_sync_offset', String(next));
+      return next;
+    });
+  };
+
+  const handleResetOffset = () => {
+    setSyncOffset(0.45);
+    localStorage.setItem('sc_lyrics_sync_offset', '0.45');
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -71,9 +88,10 @@ export default function LyricsModal({
   if (!isOpen || !track) return null;
 
   let activeIndex = -1;
-  if (lyrics && lyrics.synced) {
+  const effectiveTime = currentTime + syncOffset;
+  if (lyrics && lyrics.lines && lyrics.lines.length > 0) {
     for (let i = 0; i < lyrics.lines.length; i++) {
-      if (currentTime >= lyrics.lines[i].time) {
+      if (effectiveTime >= lyrics.lines[i].time) {
         activeIndex = i;
       } else {
         break;
@@ -174,6 +192,38 @@ export default function LyricsModal({
             <Edit3 size={13} />
             Custom Lyrics
           </button>
+
+          {activeTab === 'lyrics' && lyrics && (
+            <div className="ml-auto flex items-center gap-1 py-1.5">
+              <span className="text-[11px] text-sc-text-secondary mr-1">Синхронизация:</span>
+              <button
+                onClick={() => handleAdjustOffset(-0.25)}
+                className="px-2 py-0.5 rounded bg-[#1c1c1c] border border-sc-border text-[10px] font-semibold text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors"
+                title="Отодвинуть текст назад (-0.25с)"
+              >
+                -0.25s
+              </button>
+              <span className="tabular-nums font-mono text-[10px] text-sc-accent px-1.5 font-bold">
+                {syncOffset >= 0 ? `+${syncOffset}s` : `${syncOffset}s`}
+              </span>
+              <button
+                onClick={() => handleAdjustOffset(0.25)}
+                className="px-2 py-0.5 rounded bg-[#1c1c1c] border border-sc-border text-[10px] font-semibold text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors"
+                title="Подать текст раньше (+0.25с)"
+              >
+                +0.25s
+              </button>
+              {syncOffset !== 0.45 && (
+                <button
+                  onClick={handleResetOffset}
+                  className="text-[10px] text-sc-text-secondary hover:text-white ml-1 underline cursor-pointer"
+                  title="Сбросить на значение по умолчанию (+0.45s)"
+                >
+                  Сброс
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Content Body */}

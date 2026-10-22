@@ -1,6 +1,7 @@
 import React from 'react';
 import { Play, Pause, Heart, MoreHorizontal, Download } from 'lucide-react';
 import { Track } from '@/types';
+import { formatTime } from '@/services/utils';
 import { IconButton } from './IconButton';
 import { clsx } from 'clsx';
 
@@ -29,13 +30,6 @@ export const TrackRow: React.FC<TrackRowProps> = ({
   onArtistClick,
   showIndex = false,
 }) => {
-  const formatDuration = (seconds: number) => {
-    if (!seconds || isNaN(seconds)) return '0:00';
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return `${m}:${s < 10 ? '0' : ''}${s}`;
-  };
-
   return (
     <div
       className={clsx(
@@ -104,8 +98,8 @@ export const TrackRow: React.FC<TrackRowProps> = ({
         </span>
       )}
 
-      <span className="text-xs text-[#777777] shrink-0 font-mono w-12 text-right">
-        {formatDuration(track.duration)}
+      <span className="text-xs text-[#777777] shrink-0 font-mono w-14 text-right">
+        {formatTime(track.duration)}
       </span>
 
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">

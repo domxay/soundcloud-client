@@ -36,18 +36,37 @@ export class LyricsService {
   private parseLrc(lrcText: string): LyricLine[] {
     const lines: LyricLine[] = [];
     const rawLines = lrcText.split('\n');
-    const timeRegex = /\[(\d{2}):(\d{2})(?:\.(\d{2,3}))?\]/;
+    let offsetSeconds = 0;
+
+    // Check for [offset: +/-ms] tag
+    for (const raw of rawLines) {
+      const offsetMatch = raw.match(/\[offset:\s*([+-]?\d+)\s*\]/i);
+      if (offsetMatch) {
+        offsetSeconds = parseInt(offsetMatch[1], 10) / 1000;
+        break;
+      }
+    }
+
+    const timeGlobalRegex = /\[(\d{2}):(\d{2})(?:\.(\d{2,3}))?\]/g;
 
     for (const raw of rawLines) {
-      const match = raw.match(timeRegex);
-      if (match) {
+      const trimmed = raw.trim();
+      if (!trimmed || /^\[(ti|ar|al|by|re|ve|length|offset):/i.test(trimmed)) continue;
+
+      const timestamps: number[] = [];
+      let match: RegExpExecArray | null;
+      while ((match = timeGlobalRegex.exec(trimmed)) !== null) {
         const minutes = parseInt(match[1], 10);
         const seconds = parseInt(match[2], 10);
         const milliseconds = match[3] ? parseInt(match[3].padEnd(3, '0').slice(0, 3), 10) : 0;
-        const totalSeconds = minutes * 60 + seconds + milliseconds / 1000;
-        const text = raw.replace(timeRegex, '').trim();
-        if (text) {
-          lines.push({ time: totalSeconds, text });
+        const total = minutes * 60 + seconds + milliseconds / 1000 + offsetSeconds;
+        timestamps.push(Math.max(0, total));
+      }
+
+      const text = trimmed.replace(/\[.*?\]/g, '').trim();
+      if (text && timestamps.length > 0) {
+        for (const t of timestamps) {
+          lines.push({ time: t, text });
         }
       }
     }

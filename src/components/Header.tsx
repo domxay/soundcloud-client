@@ -230,10 +230,10 @@ export default function Header({
 
         <button
           onClick={handleOpenTelegram}
-          className="hidden xl:flex items-center gap-1.5 rounded border border-[#229ED9]/40 bg-[#229ED9]/10 px-2.5 py-1 text-xs font-semibold text-[#229ED9] hover:bg-[#229ED9] hover:text-white transition-all shadow-sm"
-          title="Author Telegram Channel"
+          className="hidden xl:flex items-center gap-1.5 rounded border border-[#282828] bg-[#1a1a1a] px-2.5 py-1 text-xs font-medium text-[#aaaaaa] hover:text-white hover:border-[#444444] transition-all shadow-sm"
+          title="Community Channel"
         >
-          <Send size={12} className="rotate-[-20deg]" />
+          <Send size={12} className="rotate-[-20deg] text-[#229ED9]" />
           <span>@codesand</span>
         </button>
 

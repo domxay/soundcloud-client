@@ -157,39 +157,39 @@ export default function TrackList({
                       onOpenComments(track);
                     }}
                     className="text-sc-text-secondary hover:text-white transition-colors p-1"
-                    title="Комментарии"
+                    title="Комментарии к треку"
                   >
                     <MessageSquare size={15} />
                   </button>
                 )}
-                <div className="group/dl relative">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDownload(track.id);
-                    }}
-                    disabled={isDownloading}
-                    className="flex items-center gap-1 rounded-sc border border-sc-border bg-sc-surface px-2 py-1 text-xs font-medium transition-colors hover:border-sc-accent hover:bg-sc-hover disabled:opacity-60"
-                  >
-                    {isDownloading ? (
-                      <Loader2 size={13} className="animate-spin text-sc-accent" />
-                    ) : (
-                      <Download size={13} />
-                    )}
-                    <span className="hidden lg:inline">Скачать</span>
-                  </button>
-                  <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-sc bg-sc-hover px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover/dl:opacity-100 z-10 shadow-lg">
-                    Скачать трек
-                  </span>
-                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDownload(track.id);
+                  }}
+                  disabled={isDownloading}
+                  className="text-sc-text-secondary hover:text-white transition-colors p-1 disabled:opacity-50"
+                  title="Скачать аудиофайл"
+                >
+                  {isDownloading ? (
+                    <Loader2 size={15} className="animate-spin text-sc-accent" />
+                  ) : (
+                    <Download size={15} />
+                  )}
+                </button>
               </div>
 
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onLikeToggle(track.id);
+                  if (track.permalink_url) {
+                    navigator.clipboard?.writeText(track.permalink_url);
+                  } else {
+                    navigator.clipboard?.writeText(`${track.artist} - ${track.title}`);
+                  }
                 }}
                 className="text-sc-text-secondary opacity-0 transition-opacity hover:text-white group-hover:opacity-100 p-1"
+                title="Копировать ссылку на трек"
               >
                 <MoreHorizontal size={16} />
               </button>
