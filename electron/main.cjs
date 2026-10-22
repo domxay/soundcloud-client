@@ -30,6 +30,23 @@ let cachedOverlayState = null;
 let currentProxyRule = null;
 let cachedClientId = 'z7SdppGR2n32vjiLbTeRJnOdA3dFn6Nn';
 
+// Single instance lock to prevent multi-process database and cache collisions
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
+// Disable persistent shader disk cache to prevent Windows GPUCache lock errors
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+
 const DEFAULT_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
   'Origin': 'https://soundcloud.com',
