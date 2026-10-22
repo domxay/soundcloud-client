@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Cloud, Key, Check, LogOut, ShieldCheck, RefreshCw, Lock, Sparkles, ExternalLink } from 'lucide-react';
 import { authService } from '@/services/auth';
 import { soundcloudApi } from '@/services/api';
+import { useI18n } from '@/services/i18n';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface LoginModalProps {
 }
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess, required = false }: LoginModalProps) {
+  const { t } = useI18n();
   const session = authService.getSession();
   const [token, setToken] = useState(session.oauthToken || '');
   const [clientId, setClientId] = useState(session.clientId || '');
@@ -78,7 +80,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, required =
         onLoginSuccess();
         onClose();
       } else {
-        setError(res.error || 'Активная сессия не обнаружена. Воспользуйтесь кнопкой «Войти через аккаунт SoundCloud».');
+        setError(res.error || 'Активная сессия не обнаружена. Воспользуйтесь входом через браузер.');
       }
     } catch (err: any) {
       setError(err?.message || 'Не удалось синхронизировать сессию.');
@@ -133,7 +135,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, required =
           <button
             onClick={onClose}
             className="absolute right-4 top-4 text-zinc-400 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10"
-            title="Закрыть"
+            title={t('cancel')}
           >
             <X size={18} />
           </button>
@@ -145,9 +147,9 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, required =
             <Cloud size={28} className="text-white" fill="white" />
           </div>
           <div>
-            <h2 className="text-lg font-bold tracking-tight text-white">Вход в аккаунт SoundCloud</h2>
+            <h2 className="text-lg font-bold tracking-tight text-white">{t('loginToSoundCloud')}</h2>
             <p className="text-xs text-zinc-400 mt-0.5">
-              Для воспроизведения музыки и доступа к медиатеке
+              {t('loginDescription')}
             </p>
           </div>
         </div>
@@ -160,7 +162,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, required =
                 <Check size={14} />
               </div>
               <span className="text-xs text-emerald-300">
-                Вы авторизованы как <strong className="text-white">{session.user?.username || 'SoundCloud User'}</strong>
+                {t('authorizedAs')} <strong className="text-white">{session.user?.username || 'SoundCloud User'}</strong>
               </span>
             </div>
             <button
@@ -168,7 +170,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, required =
               className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 font-medium px-2 py-1 rounded hover:bg-white/5 transition-colors"
             >
               <LogOut size={13} />
-              <span>Выйти</span>
+              <span>{t('logout')}</span>
             </button>
           </div>
         )}
@@ -178,7 +180,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, required =
           <div className="mb-4 rounded-xl bg-[#201510] border border-[#ff5500]/30 p-3 flex items-start gap-2.5 text-xs">
             <Lock size={15} className="text-[#ff5500] shrink-0 mt-0.5" />
             <div className="text-zinc-300 leading-snug">
-              Воспроизведение треков, плейлисты и синхронизация лайков доступны после входа в ваш профиль SoundCloud.
+              {t('loginNotice')}
             </div>
           </div>
         )}
@@ -188,10 +190,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, required =
           <div className="mb-4 rounded-xl bg-zinc-900/90 border border-white/5 p-3 text-xs flex items-start gap-2.5">
             <ShieldCheck size={15} className="text-emerald-400 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-white font-medium">Маршрут подключения: {detectedProxy.name}</p>
-              <p className="text-[11px] text-zinc-400 mt-0.5 leading-snug">
-                Если поток не загружается, проверьте активность VPN или переключите Clash Verge в режим Rule/Global.
-              </p>
+              <p className="text-white font-medium">{t('connectionRoute')}: {detectedProxy.name}</p>
             </div>
           </div>
         )}
@@ -204,7 +203,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, required =
             className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-[#ff5500] hover:bg-[#ff6600] active:scale-[0.99] py-3 px-4 text-sm font-bold text-white transition-all disabled:opacity-50 shadow-lg shadow-[#ff5500]/25"
           >
             <Cloud size={18} fill="white" />
-            <span>{loading ? 'Подключение к SoundCloud...' : 'Войти через аккаунт SoundCloud'}</span>
+            <span>{loading ? t('connecting') : t('browserLogin')}</span>
           </button>
 
           <button
@@ -213,7 +212,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, required =
             className="w-full flex items-center justify-center gap-2 rounded-xl bg-zinc-800/90 hover:bg-zinc-700/90 border border-white/10 active:scale-[0.99] py-2.5 px-4 text-xs font-semibold text-zinc-200 transition-all disabled:opacity-50"
           >
             <RefreshCw size={14} className={syncing ? 'animate-spin text-[#ff5500]' : 'text-zinc-400'} />
-            <span>{syncing ? 'Синхронизация сессии...' : 'Синхронизировать сессию браузера'}</span>
+            <span>{syncing ? t('connecting') : t('cookiesSync')}</span>
           </button>
 
           {/* Collapsible Manual Credentials */}
@@ -223,7 +222,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, required =
               type="button"
               className="w-full text-center text-xs text-zinc-400 hover:text-zinc-200 transition-colors py-1 flex items-center justify-center gap-1.5"
             >
-              <span>{showManual ? 'Скрыть ручной ввод' : 'Ручной ввод токена сессии'}</span>
+              <span>{showManual ? t('hideManualLogin') : t('tokenLogin')}</span>
             </button>
 
             {showManual && (
@@ -236,7 +235,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, required =
                       type="text"
                       value={token}
                       onChange={(e) => setToken(e.target.value)}
-                      placeholder="OAuth 2-xxxx или JWT токен"
+                      placeholder={t('tokenPlaceholder')}
                       className="w-full rounded-lg border border-white/10 bg-zinc-900/90 py-2 pl-9 pr-3 text-xs text-white placeholder:text-zinc-600 focus:border-[#ff5500] focus:outline-none transition-colors"
                     />
                   </div>
@@ -259,7 +258,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, required =
                     disabled={loading || syncing}
                     className="rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-[#ff5500]/40 px-4 py-1.5 text-xs font-bold text-[#ff5500] hover:text-white transition-colors disabled:opacity-50"
                   >
-                    Применить ключ
+                    {t('applyToken')}
                   </button>
                 </div>
               </div>
@@ -278,7 +277,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, required =
                 onClick={onClose}
                 className="text-xs text-zinc-400 hover:text-white transition-colors px-3 py-1.5"
               >
-                Продолжить без входа
+                {t('continueWithoutLogin')}
               </button>
             </div>
           )}

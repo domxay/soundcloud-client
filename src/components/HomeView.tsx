@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Track, Playlist } from '@/types';
 import { soundcloudApi } from '@/services/api';
 import { formatRelativeTime } from '@/services/utils';
+import { useI18n } from '@/services/i18n';
 import { Play, Pause, Heart, Download, Sparkles, Flame, Trophy, ListMusic, Loader2, ArrowRight, RefreshCw, Radio, AlertCircle } from 'lucide-react';
 import TrackList from './TrackList';
 
@@ -44,6 +45,7 @@ export default function HomeView({
   onNavigateTab,
 }: HomeViewProps) {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [activeGenre, setActiveGenre] = useState('All');
   const activeGenreRef = useRef('All');
   const [charts, setCharts] = useState<Track[]>([]);
@@ -154,7 +156,7 @@ export default function HomeView({
           className="flex items-center gap-1.5 self-start sm:self-auto rounded-sc border border-sc-border bg-sc-surface px-3 py-1 text-xs font-semibold text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors"
         >
           <RefreshCw size={12} className={loading ? 'animate-spin text-sc-accent' : ''} />
-          <span>Обновить стрим</span>
+          <span>{t('refreshStream')}</span>
         </button>
       </div>
 
@@ -162,9 +164,9 @@ export default function HomeView({
         <div className="rounded-lg border border-amber-800/60 bg-amber-950/20 p-4 flex items-start gap-3">
           <AlertCircle className="text-amber-400 shrink-0 mt-0.5" size={18} />
           <div>
-            <h4 className="text-sm font-bold text-amber-300">Серверы SoundCloud не ответили</h4>
+            <h4 className="text-sm font-bold text-amber-300">{t('serverUnavailableTitle')}</h4>
             <p className="text-xs text-amber-200/80 mt-1">
-              В вашем регионе соединение может блокироваться провайдером. Откройте <strong>Settings (Настройки) &rarr; VPN и Обход</strong> и выберите обнаруженный локальный прокси (Clash Verge / v2rayN) или включите системный VPN.
+              {t('serverUnavailableDesc')}
             </p>
           </div>
         </div>
@@ -203,7 +205,7 @@ export default function HomeView({
                 <div className="flex items-center justify-center md:justify-start gap-2 mb-1.5">
                   <Flame size={14} className="text-sc-accent" />
                   <span className="text-xs font-bold text-sc-accent uppercase tracking-wider">
-                    #1 Trending Global
+                    {t('trendingGlobal')}
                   </span>
                 </div>
                 <h1 className="text-2xl md:text-4xl font-black text-white leading-tight truncate">
@@ -240,12 +242,12 @@ export default function HomeView({
                     {currentTrackId === heroTrack.id && isPlaying ? (
                       <>
                         <Pause size={16} fill="white" />
-                        Пауза
+                        {t('pause')}
                       </>
                     ) : (
                       <>
                         <Play size={16} fill="white" />
-                        Слушать
+                        {t('play')}
                       </>
                     )}
                   </button>
@@ -257,7 +259,7 @@ export default function HomeView({
                     }`}
                   >
                     <Heart size={15} fill={heroTrack.liked ? 'var(--sc-accent)' : 'none'} />
-                    {heroTrack.liked ? 'В избранном' : 'Лайк'}
+                    {heroTrack.liked ? t('trackLiked') : t('like')}
                   </button>
 
                   <button
@@ -265,7 +267,7 @@ export default function HomeView({
                     className="flex items-center gap-1.5 rounded-sc border border-sc-border bg-sc-surface px-4 py-2.5 text-xs font-semibold text-white hover:bg-sc-hover transition-colors"
                   >
                     <Download size={15} />
-                    Скачать
+                    {t('download')}
                   </button>
                 </div>
               </div>
@@ -279,15 +281,15 @@ export default function HomeView({
           <div>
             <div className="flex items-center gap-2 text-sc-accent">
               <Trophy size={18} />
-              <h2 className="text-xl font-bold text-white">Топ 50 Чарт SoundCloud</h2>
+              <h2 className="text-xl font-bold text-white">{t('top50')}</h2>
             </div>
-            <p className="text-xs text-sc-text-secondary mt-0.5">Самые популярные треки мира в реальном времени</p>
+            <p className="text-xs text-sc-text-secondary mt-0.5">{t('top50Subtitle')}</p>
           </div>
           <button
             onClick={() => onNavigateTab('Stream')}
             className="text-xs text-sc-accent hover:underline font-semibold flex items-center gap-1"
           >
-            Слушать весь чарт
+            {t('listenEntireChart')}
             <ArrowRight size={13} />
           </button>
         </div>
@@ -295,7 +297,7 @@ export default function HomeView({
         {loading && charts.length === 0 ? (
           <div className="flex items-center justify-center py-16 text-sc-text-secondary">
             <Loader2 size={24} className="animate-spin text-sc-accent mr-2" />
-            Загрузка чарта SoundCloud...
+            {t('loadingChart')}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -358,15 +360,15 @@ export default function HomeView({
           <div>
             <div className="flex items-center gap-2 text-sc-accent">
               <Sparkles size={18} />
-              <h2 className="text-xl font-bold text-white">Плейлисты и Миксы</h2>
+              <h2 className="text-xl font-bold text-white">{t('playlistsAndMixes')}</h2>
             </div>
-            <p className="text-xs text-sc-text-secondary mt-0.5">Кураторские подборки редакции SoundCloud</p>
+            <p className="text-xs text-sc-text-secondary mt-0.5">{t('playlistsSubtitle')}</p>
           </div>
           <button
             onClick={() => onNavigateTab('Playlists')}
             className="text-xs text-sc-accent hover:underline font-semibold flex items-center gap-1"
           >
-            Все плейлисты ({playlists.length})
+            {t('allPlaylists')} ({playlists.length})
             <ArrowRight size={13} />
           </button>
         </div>
@@ -402,7 +404,7 @@ export default function HomeView({
                 <h4 className="text-xs font-bold text-white truncate" title={p.title}>{p.title}</h4>
                 <p className="text-[11px] text-sc-text-secondary truncate mt-0.5">{p.artist}</p>
                 <span className="text-[10px] text-sc-accent mt-1 inline-block font-medium">
-                  {p.tracks.length > 0 ? `${p.tracks.length} треков` : 'Подборка'}
+                  {p.tracks.length > 0 ? `${p.tracks.length} ${t('tracksCount')}` : t('playlists')}
                 </span>
               </div>
             </div>
@@ -416,9 +418,9 @@ export default function HomeView({
             <div>
               <div className="flex items-center gap-2 text-sc-accent">
                 <Radio size={18} />
-                <h2 className="text-xl font-bold text-white">Новые Релизы 2026</h2>
+                <h2 className="text-xl font-bold text-white">{t('newReleasesTitle')}</h2>
               </div>
-              <p className="text-xs text-sc-text-secondary mt-0.5">Свежие треки, загруженные авторами за последнее время</p>
+              <p className="text-xs text-sc-text-secondary mt-0.5">{t('newReleasesSubtitle')}</p>
             </div>
           </div>
 
@@ -457,7 +459,7 @@ export default function HomeView({
                       {track.title}
                     </h4>
                     <p className="text-[11px] text-sc-text-secondary truncate mt-0.5">{track.artist}</p>
-                    <span className="text-[10px] text-emerald-400 font-semibold">Новый релиз</span>
+                    <span className="text-[10px] text-emerald-400 font-semibold">{t('newReleaseTag')}</span>
                   </div>
 
                   <button
@@ -476,8 +478,8 @@ export default function HomeView({
       <section>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
-            <h2 className="text-xl font-bold text-white">Жанры и категории</h2>
-            <p className="text-xs text-sc-text-secondary mt-0.5">Быстрое переключение по жанрам</p>
+            <h2 className="text-xl font-bold text-white">{t('genresAndCategories')}</h2>
+            <p className="text-xs text-sc-text-secondary mt-0.5">{t('genresSubtitle')}</p>
           </div>
 
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
@@ -500,7 +502,7 @@ export default function HomeView({
         {genreLoading ? (
           <div className="flex items-center justify-center py-20 text-sc-text-secondary">
             <Loader2 size={24} className="animate-spin text-sc-accent mr-2" />
-            Загрузка треков {activeGenre}...
+            {t('loadingGenreTracks')} ({activeGenre})
           </div>
         ) : (
           <TrackList

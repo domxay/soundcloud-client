@@ -1,5 +1,6 @@
 import { Download, FolderOpen, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { DownloadItem } from '@/types';
+import { useI18n } from '@/services/i18n';
 
 interface DownloadsViewProps {
   downloads: DownloadItem[];
@@ -7,6 +8,8 @@ interface DownloadsViewProps {
 }
 
 export default function DownloadsView({ downloads, onOpenFolder }: DownloadsViewProps) {
+  const { t } = useI18n();
+
   const handleOpenDownloadsFolder = () => {
     if ((window as any).electronAPI?.openDownloadsFolder) {
       (window as any).electronAPI.openDownloadsFolder();
@@ -21,10 +24,10 @@ export default function DownloadsView({ downloads, onOpenFolder }: DownloadsView
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-3">
             <Download className="text-sc-accent" size={26} />
-            Downloads Manager
+            {t('downloadsTitle')}
           </h1>
           <p className="text-sm text-sc-text-secondary mt-1">
-            Free downloaded tracks directly from SoundCloud streams
+            {t('downloadsSubtitle')}
           </p>
         </div>
         <button
@@ -32,16 +35,16 @@ export default function DownloadsView({ downloads, onOpenFolder }: DownloadsView
           className="flex items-center gap-2 rounded-sc border border-sc-border bg-sc-surface px-4 py-2 text-sm font-medium text-white hover:bg-sc-hover transition-colors"
         >
           <FolderOpen size={16} />
-          Open Downloads Folder
+          {t('openDownloadsFolder')}
         </button>
       </div>
 
       {downloads.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <Download size={48} className="text-sc-border mb-4" />
-          <h3 className="text-lg font-medium text-white">No downloads yet</h3>
+          <h3 className="text-lg font-medium text-white">{t('noDownloads')}</h3>
           <p className="text-sm text-sc-text-secondary max-w-sm mt-1">
-            Click the download button next to any track or playlist to save it for free on your PC.
+            {t('noDownloadsDesc')}
           </p>
         </div>
       ) : (
@@ -73,19 +76,19 @@ export default function DownloadsView({ downloads, onOpenFolder }: DownloadsView
                 {item.status === 'completed' && (
                   <div className="flex items-center gap-1.5 text-xs text-green-400 font-medium">
                     <CheckCircle2 size={16} />
-                    <span>Saved</span>
+                    <span>{t('downloadComplete')}</span>
                   </div>
                 )}
                 {item.status === 'downloading' && (
                   <div className="flex items-center gap-1.5 text-xs text-sc-accent font-medium">
                     <Loader2 size={16} className="animate-spin-slow" />
-                    <span>Downloading...</span>
+                    <span>{t('downloading')}</span>
                   </div>
                 )}
                 {item.status === 'error' && (
                   <div className="flex items-center gap-1.5 text-xs text-red-400 font-medium" title={item.error}>
                     <AlertCircle size={16} />
-                    <span>Failed</span>
+                    <span>{t('downloadFailed')}</span>
                   </div>
                 )}
               </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { UserProfile, Track, Playlist } from '@/types';
 import { soundcloudApi } from '@/services/api';
+import { useI18n } from '@/services/i18n';
 import { ExternalLink, Music, Heart, ListMusic, MapPin, Users, Disc3 } from 'lucide-react';
 import TrackList from './TrackList';
 
@@ -27,6 +28,7 @@ export default function ProfileView({
   onOpenLogin,
   onOpenComments,
 }: ProfileViewProps) {
+  const { t } = useI18n();
   const [profileTab, setProfileTab] = useState<'stream' | 'likes' | 'playlists'>('stream');
   const [historyTracks, setHistoryTracks] = useState<Track[]>([]);
   const [likedTracks, setLikedTracks] = useState<Track[]>([]);
@@ -58,44 +60,31 @@ export default function ProfileView({
       setLikedTracks((prev) => {
         if (isLiked) {
           const found = soundcloudApi.getTrack(trackId);
-          if (found && !prev.some((t) => t.id === trackId)) {
+          if (found && !prev.some((tr) => tr.id === trackId)) {
             return [{ ...found, liked: true }, ...prev];
           }
-          return prev.map((t) => (t.id === trackId ? { ...t, liked: true } : t));
+          return prev.map((tr) => (tr.id === trackId ? { ...tr, liked: true } : tr));
         } else {
-          return prev.filter((t) => t.id !== trackId);
+          return prev.filter((tr) => tr.id !== trackId);
         }
       });
-      setHistoryTracks((prev) =>
-        prev.map((t) => (t.id === trackId ? { ...t, liked: isLiked } : t))
-      );
     });
-
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') load(true);
-    }, 120000);
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') load(true);
-    };
-    document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
       isMounted = false;
       unsub();
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
 
+  const username = user?.username || 'SoundCloud Member';
+  const avatar = user?.avatar_url;
+  const location = [user?.city, user?.country_code].filter(Boolean).join(', ');
+
   const handleOpenWebProfile = () => {
-    if (user?.permalink_url) {
-      window.open(user.permalink_url, '_blank');
+    if (user?.permalink_url && (window as any).electronAPI?.openExternal) {
+      (window as any).electronAPI.openExternal(user.permalink_url);
     }
   };
-
-  const username = user?.username || 'SoundCloud User';
-  const avatar = user?.avatar_url;
-  const location = user?.city ? `${user.city}${user.country_code ? `, ${user.country_code}` : ''}` : null;
 
   return (
     <div className="p-8 max-w-6xl mx-auto pb-32">
@@ -114,7 +103,7 @@ export default function ProfileView({
           )}
 
           <div className="flex-1 text-center md:text-left">
-            <span className="text-[11px] font-bold uppercase tracking-widest text-sc-accent">SOUNDCLOUD PROFILE</span>
+            <span className="text-[11px] font-bold uppercase tracking-widest text-sc-accent">{t('profileTitle')}</span>
             <h1 className="text-3xl md:text-4xl font-extrabold text-white mt-1">{username}</h1>
 
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-xs text-sc-text-secondary mt-2">
@@ -126,18 +115,18 @@ export default function ProfileView({
               )}
               <div className="flex items-center gap-1">
                 <Users size={13} />
-                <span>{user?.followers_count ?? 0} Followers</span>
+                <span>{user?.followers_count ?? 0} {t('followersCount')}</span>
               </div>
               <div className="flex items-center gap-1">
-                <span>{user?.followings_count ?? 0} Following</span>
+                <span>{user?.followings_count ?? 0} {t('followingCount')}</span>
               </div>
               <div className="flex items-center gap-1">
                 <Disc3 size={13} />
-                <span>{historyTracks.length} Stream Tracks</span>
+                <span>{historyTracks.length} {t('streamTracksCount')}</span>
               </div>
               <div className="flex items-center gap-1">
                 <Heart size={13} />
-                <span>{likedTracks.length} Likes</span>
+                <span>{likedTracks.length} {t('likesCount')}</span>
               </div>
             </div>
           </div>
@@ -149,14 +138,14 @@ export default function ProfileView({
                 className="flex items-center gap-1.5 rounded-sc border border-sc-border bg-sc-surface px-3.5 py-2 text-xs font-semibold text-white hover:bg-sc-hover transition-colors"
               >
                 <ExternalLink size={14} />
-                Open on SoundCloud
+                {t('openOnWeb')}
               </button>
             )}
             <button
               onClick={onOpenLogin}
               className="flex items-center gap-1.5 rounded-sc bg-sc-accent px-4 py-2 text-xs font-bold text-white hover:bg-sc-accent-hover transition-colors shadow-lg shadow-sc-accent/25"
             >
-              Switch Account
+              {t('switchAccount')}
             </button>
           </div>
         </div>
@@ -172,7 +161,7 @@ export default function ProfileView({
           }`}
         >
           <Music size={15} />
-          Recently Played ({historyTracks.length})
+          {t('recentlyPlayed')} ({historyTracks.length})
         </button>
         <button
           onClick={() => setProfileTab('likes')}
@@ -183,7 +172,7 @@ export default function ProfileView({
           }`}
         >
           <Heart size={15} />
-          Liked Tracks ({likedTracks.length})
+          {t('likedTracks')} ({likedTracks.length})
         </button>
         <button
           onClick={() => setProfileTab('playlists')}
@@ -194,44 +183,56 @@ export default function ProfileView({
           }`}
         >
           <ListMusic size={15} />
-          Playlists ({userPlaylists.length})
+          {t('playlists')} ({userPlaylists.length})
         </button>
       </div>
 
-      {loading ? (
-        <div className="text-center py-20 text-sc-text-secondary">Loading profile tracks...</div>
-      ) : profileTab === 'playlists' ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          {userPlaylists.map((p) => (
-            <div
-              key={p.id}
-              className="group rounded-sc border border-sc-border bg-sc-surface p-4 transition-all hover:border-sc-accent hover:bg-sc-hover"
-            >
-              <img
-                src={p.artwork}
-                alt={p.title}
-                className="w-full aspect-square rounded-sc object-cover shadow-lg border border-sc-border mb-3"
-              />
-              <h4 className="text-sm font-bold text-white truncate">{p.title}</h4>
-              <p className="text-xs text-sc-text-secondary truncate mt-0.5">{p.artist}</p>
-              <span className="text-[11px] text-sc-accent mt-2 inline-block font-medium">
-                {p.tracks.length} tracks
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <TrackList
-          tracks={profileTab === 'stream' ? historyTracks : likedTracks}
-          currentTrackId={currentTrackId}
-          isPlaying={isPlaying}
-          onTrackPlay={onTrackPlay}
-          onLikeToggle={onLikeToggle}
-          downloadingIds={downloadingIds}
-          onDownload={onDownload}
-          onOpenComments={onOpenComments}
-        />
-      )}
+      <div>
+        {profileTab === 'stream' && (
+          <TrackList
+            tracks={historyTracks}
+            currentTrackId={currentTrackId}
+            isPlaying={isPlaying}
+            onTrackPlay={onTrackPlay}
+            onLikeToggle={onLikeToggle}
+            downloadingIds={downloadingIds}
+            onDownload={onDownload}
+            onOpenComments={onOpenComments}
+          />
+        )}
+
+        {profileTab === 'likes' && (
+          <TrackList
+            tracks={likedTracks}
+            currentTrackId={currentTrackId}
+            isPlaying={isPlaying}
+            onTrackPlay={onTrackPlay}
+            onLikeToggle={onLikeToggle}
+            downloadingIds={downloadingIds}
+            onDownload={onDownload}
+            onOpenComments={onOpenComments}
+          />
+        )}
+
+        {profileTab === 'playlists' && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {userPlaylists.map((p) => (
+              <div
+                key={p.id}
+                className="group cursor-pointer rounded-sc border border-sc-border bg-sc-surface p-3 hover:border-sc-accent transition-all"
+              >
+                <img
+                  src={p.artwork}
+                  alt={p.title}
+                  className="aspect-square w-full rounded-sc object-cover mb-2 border border-sc-border"
+                />
+                <h4 className="text-xs font-bold text-white truncate">{p.title}</h4>
+                <p className="text-[11px] text-sc-text-secondary truncate mt-0.5">{p.tracks.length} {t('tracksCount')}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Playlist, Track } from '@/types';
 import { soundcloudApi } from '@/services/api';
+import { useI18n } from '@/services/i18n';
 import { Play, Download, Heart, Clock, ListMusic, Sparkles, Loader2, ArrowLeft, Music } from 'lucide-react';
 import TrackList from './TrackList';
 
@@ -25,6 +26,7 @@ export default function LibraryView({
   onSelectPlaylist,
   onOpenComments,
 }: LibraryViewProps) {
+  const { t } = useI18n();
   const [tab, setTab] = useState<'overview' | 'playlists' | 'likes' | 'history'>('overview');
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [likes, setLikes] = useState<Track[]>([]);
@@ -100,7 +102,7 @@ export default function LibraryView({
           className="flex items-center gap-2 text-xs font-bold text-sc-text-secondary hover:text-white mb-6 transition-colors"
         >
           <ArrowLeft size={16} />
-          Back to Library
+          {t('backToLibrary')}
         </button>
 
         <div className="flex flex-col md:flex-row items-start md:items-end gap-6 mb-8 border-b border-sc-border pb-8">
@@ -111,13 +113,13 @@ export default function LibraryView({
           />
           <div className="flex-1 min-w-0">
             <span className="text-xs uppercase font-extrabold tracking-wider text-sc-accent">
-              Playlist
+              {t('playlists')}
             </span>
             <h1 className="text-3xl md:text-4xl font-black text-white mt-1 mb-2 break-words">
               {selectedPlaylistView.title}
             </h1>
             <p className="text-sm text-sc-text-secondary mb-4">
-              Curated by <span className="text-white font-semibold">{selectedPlaylistView.artist}</span> • {selectedPlaylistView.tracks.length} tracks
+              {t('curatedBy')} <span className="text-white font-semibold">{selectedPlaylistView.artist}</span> • {selectedPlaylistView.tracks.length} {t('tracksCount')}
             </p>
 
             <div className="flex items-center gap-3">
@@ -126,7 +128,7 @@ export default function LibraryView({
                 className="flex items-center gap-2 rounded-sc bg-sc-accent px-6 py-2.5 text-xs font-bold text-white hover:bg-sc-accent-hover transition-colors shadow-lg shadow-sc-accent/25"
               >
                 <Play size={16} fill="white" />
-                Play All Tracks
+                {t('playAll')}
               </button>
             </div>
           </div>
@@ -151,10 +153,10 @@ export default function LibraryView({
       <div className="border-b border-sc-border pb-6 mb-8">
         <h1 className="text-3xl font-extrabold text-white flex items-center gap-3">
           <ListMusic className="text-sc-accent" size={32} />
-          Library
+          {t('libraryTitle')}
         </h1>
         <p className="text-sm text-sc-text-secondary mt-1">
-          Explore your saved collection, featured playlists, liked tracks, and listening history.
+          {t('librarySubtitle')}
         </p>
 
         <div className="flex items-center gap-2 mt-6">
@@ -166,7 +168,7 @@ export default function LibraryView({
                 : 'bg-sc-surface border border-sc-border text-sc-text-secondary hover:text-white hover:bg-sc-hover'
             }`}
           >
-            Overview
+            {t('overviewTab')}
           </button>
           <button
             onClick={() => setTab('playlists')}
@@ -177,7 +179,7 @@ export default function LibraryView({
             }`}
           >
             <ListMusic size={13} />
-            Playlists ({playlists.length})
+            {t('playlistsTab')} ({playlists.length})
           </button>
           <button
             onClick={() => setTab('likes')}
@@ -188,7 +190,7 @@ export default function LibraryView({
             }`}
           >
             <Heart size={13} />
-            Liked Tracks ({likes.length})
+            {t('likedTab')} ({likes.length})
           </button>
           <button
             onClick={() => setTab('history')}
@@ -199,7 +201,7 @@ export default function LibraryView({
             }`}
           >
             <Clock size={13} />
-            Listening History ({history.length})
+            {t('historyTab')} ({history.length})
           </button>
         </div>
       </div>
@@ -207,14 +209,14 @@ export default function LibraryView({
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 text-sc-text-secondary">
           <Loader2 size={32} className="animate-spin-slow text-sc-accent mb-3" />
-          <p className="text-sm">Loading your SoundCloud library...</p>
+          <p className="text-sm">{t('loadingLibrary')}</p>
         </div>
       ) : tab === 'playlists' ? (
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
               <Sparkles className="text-sc-accent" size={18} />
-              Featured & Curated Playlists
+              {t('featuredPlaylists')}
             </h2>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
@@ -240,7 +242,7 @@ export default function LibraryView({
                 <h4 className="text-sm font-bold text-white truncate">{p.title}</h4>
                 <p className="text-xs text-sc-text-secondary truncate mt-0.5">{p.artist}</p>
                 <span className="text-[11px] text-sc-accent mt-2 inline-block font-medium">
-                  {p.tracks.length} tracks
+                  {p.tracks.length} {t('tracksCount')}
                 </span>
               </div>
             ))}
@@ -252,16 +254,16 @@ export default function LibraryView({
             <div className="space-y-8">
               <div className="text-center py-12 rounded-sc border border-dashed border-sc-border bg-sc-surface p-8">
                 <Heart size={44} className="text-sc-accent mb-3 mx-auto" />
-                <h3 className="text-lg font-bold text-white">No Liked Tracks Yet</h3>
+                <h3 className="text-lg font-bold text-white">{t('noLikedTracks')}</h3>
                 <p className="text-xs text-sc-text-secondary max-w-sm mx-auto mt-1 mb-4">
-                  Click the heart icon on any track to add it to your personal likes. Discover hot tracks below:
+                  {t('noLikedTracksDesc')}
                 </p>
               </div>
 
               <div>
                 <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
                   <Sparkles size={16} className="text-sc-accent" />
-                  Trending Tracks to Like
+                  {t('trendingToLike')}
                 </h3>
                 <TrackList
                   tracks={trending}
@@ -305,13 +307,13 @@ export default function LibraryView({
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <Sparkles className="text-sc-accent" size={18} />
-                Featured & Personal Playlists
+                {t('featuredPlaylists')}
               </h2>
               <button
                 onClick={() => setTab('playlists')}
                 className="text-xs text-sc-accent hover:underline font-semibold"
               >
-                View all ({playlists.length})
+                {t('viewAll')} ({playlists.length})
               </button>
             </div>
 
@@ -338,7 +340,7 @@ export default function LibraryView({
                   <h4 className="text-sm font-bold text-white truncate">{p.title}</h4>
                   <p className="text-xs text-sc-text-secondary truncate mt-0.5">{p.artist}</p>
                   <span className="text-[11px] text-sc-accent mt-2 inline-block font-medium">
-                    {p.tracks.length} tracks
+                    {p.tracks.length} {t('tracksCount')}
                   </span>
                 </div>
               ))}
@@ -349,19 +351,19 @@ export default function LibraryView({
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <Heart className="text-sc-accent" size={18} />
-                Liked Tracks ({likes.length})
+                {t('likedTracks')} ({likes.length})
               </h2>
               <button
                 onClick={() => setTab('likes')}
                 className="text-xs text-sc-accent hover:underline font-semibold"
               >
-                View all
+                {t('viewAll')}
               </button>
             </div>
 
             {likes.length === 0 ? (
               <div className="rounded-sc border border-sc-border bg-sc-surface p-6 text-center">
-                <p className="text-sm text-sc-text-secondary">No liked tracks yet. Click the heart icon on any song to save it here.</p>
+                <p className="text-sm text-sc-text-secondary">{t('noLikedTracks')}</p>
               </div>
             ) : (
               <TrackList

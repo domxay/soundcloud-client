@@ -4,6 +4,7 @@ import { queueService, QueueState } from '@/services/queue';
 import { Track } from '@/types';
 import { TrackRow } from '@/components/ui/TrackRow';
 import { Button } from '@/components/ui/Button';
+import { useI18n } from '@/services/i18n';
 
 interface QueuePanelProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export const QueuePanel: React.FC<QueuePanelProps> = ({
   isPlaying = false,
   onPlayPause,
 }) => {
+  const { t } = useI18n();
   const [state, setState] = useState<QueueState>(queueService.getState());
 
   useEffect(() => {
@@ -36,7 +38,7 @@ export const QueuePanel: React.FC<QueuePanelProps> = ({
       <div className="flex items-center justify-between px-5 py-4 border-b border-[#282828]">
         <div className="flex items-center gap-2">
           <Music size={18} className="text-[#ff5500]" />
-          <h2 className="font-bold text-white text-base">Next up</h2>
+          <h2 className="font-bold text-white text-base">{t('queue')}</h2>
           <span className="text-xs text-[#888888] font-mono">
             ({state.items.length})
           </span>
@@ -48,9 +50,9 @@ export const QueuePanel: React.FC<QueuePanelProps> = ({
               size="sm"
               icon={<Trash2 size={14} />}
               onClick={() => queueService.clear()}
-              title="Clear upcoming queue"
+              title={t('clearQueue')}
             >
-              Clear
+              {t('clearQueue')}
             </Button>
           )}
           <button
@@ -68,68 +70,54 @@ export const QueuePanel: React.FC<QueuePanelProps> = ({
             <div className="flex items-center justify-between mb-2">
               <span className="text-[11px] font-bold text-[#ff5500] uppercase tracking-wider flex items-center gap-1.5">
                 <span className="relative flex h-2 w-2">
-                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff5500] ${isPlaying ? 'opacity-75' : 'opacity-0'}`} />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#ff5500]" />
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff5500] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#ff5500]"></span>
                 </span>
-                Now Playing
+                {t('nowPlaying')}
               </span>
-              {onPlayPause && (
-                <button
-                  onClick={onPlayPause}
-                  className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#ff5500] text-white hover:bg-[#ff6600] transition-colors flex items-center gap-1 shadow-sm"
-                  title={isPlaying ? 'Pause playback' : 'Resume playback'}
-                >
-                  {isPlaying ? (
-                    <>
-                      <Pause size={12} className="fill-white" />
-                      <span>Pause</span>
-                    </>
-                  ) : (
-                    <>
-                      <Play size={12} className="fill-white ml-0.5" />
-                      <span>Play</span>
-                    </>
-                  )}
-                </button>
-              )}
             </div>
             <TrackRow
               track={currentTrack}
+              index={state.currentIndex + 1}
               isActive={true}
               isPlaying={isPlaying}
-              onPlay={() => {
-                if (onPlayPause) {
-                  onPlayPause();
-                } else {
-                  onPlayTrack(currentTrack);
-                }
-              }}
+              onPlay={() => onPlayTrack(currentTrack)}
             />
           </div>
         )}
 
         <div>
-          <span className="text-xs font-semibold text-[#888888] uppercase tracking-wider px-2 mb-2 block">
-            Next in Queue ({upcomingTracks.length})
-          </span>
+          <div className="flex items-center justify-between px-2 mb-2">
+            <span className="text-xs font-semibold text-[#888888] uppercase tracking-wider">
+              {t('upNext')}
+            </span>
+            <span className="text-xs text-[#666666]">
+              {upcomingTracks.length}
+            </span>
+          </div>
+
           {upcomingTracks.length === 0 ? (
-            <div className="text-center py-8 text-xs text-[#777777]">
-              No upcoming tracks in queue. Play a track or add to queue.
+            <div className="py-12 text-center text-[#666666] text-xs">
+              {t('emptyQueue')}
             </div>
           ) : (
             <div className="space-y-1">
-              {upcomingTracks.map((track, i) => {
-                const actualIndex = state.currentIndex + 1 + i;
-                return (
-                  <div key={`${track.id}-${actualIndex}`} className="relative group">
-                    <TrackRow
-                      track={track}
-                      onPlay={() => onPlayTrack(track)}
-                      onMore={() => queueService.remove(actualIndex)}
-                    />
-                  </div>
-                );
-              })}
+              {upcomingTracks.map((track, i) => (
+                <div key={`${track.id}-${i}`} className="group relative">
+                  <TrackRow
+                    track={track}
+                    index={state.currentIndex + 2 + i}
+                    onPlay={() => onPlayTrack(track)}
+                  />
+                  <button
+                    onClick={() => queueService.remove(state.currentIndex + 1 + i)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded flex items-center justify-center text-[#666666] hover:text-[#ff5500] hover:bg-[#282828] opacity-0 group-hover:opacity-100 transition-all"
+                    title={t('clearQueue')}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>

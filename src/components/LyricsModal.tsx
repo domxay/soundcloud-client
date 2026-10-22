@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Track, LyricsData } from '@/types';
 import { lyricsService } from '@/services/lyrics';
+import { useI18n } from '@/services/i18n';
 import { X, Mic2, Loader2, Music2, ExternalLink, Edit3, Check, FileText } from 'lucide-react';
 
 interface LyricsModalProps {
@@ -18,6 +19,7 @@ export default function LyricsModal({
   onClose,
   onSeek,
 }: LyricsModalProps) {
+  const { t } = useI18n();
   const [lyrics, setLyrics] = useState<LyricsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'lyrics' | 'description' | 'editor'>('lyrics');
@@ -69,6 +71,9 @@ export default function LyricsModal({
               setActiveTab('lyrics');
             }
           }
+        })
+        .catch(() => {
+          if (isMounted) setLoading(false);
         });
     }
     return () => {
@@ -78,67 +83,61 @@ export default function LyricsModal({
 
   useEffect(() => {
     if (activeLineRef.current && containerRef.current && activeTab === 'lyrics') {
-      activeLineRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-      });
+      const activeEl = activeLineRef.current;
+      const container = containerRef.current;
+      const targetScroll =
+        activeEl.offsetTop - container.offsetTop - container.clientHeight / 2 + activeEl.clientHeight / 2;
+      container.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
     }
   }, [currentTime, activeTab]);
 
   if (!isOpen || !track) return null;
 
-  let activeIndex = -1;
-  const effectiveTime = currentTime + syncOffset;
-  if (lyrics && lyrics.lines && lyrics.lines.length > 0) {
-    for (let i = 0; i < lyrics.lines.length; i++) {
-      if (effectiveTime >= lyrics.lines[i].time) {
-        activeIndex = i;
-      } else {
-        break;
-      }
-    }
-  }
+  const adjustedTime = Math.max(0, currentTime + syncOffset);
+  const activeIndex = lyrics?.lines.findIndex((line, index) => {
+    const nextLine = lyrics.lines[index + 1];
+    return adjustedTime >= line.time && (!nextLine || adjustedTime < nextLine.time);
+  }) ?? -1;
 
   const handleSaveCustomLyrics = () => {
+    if (!track) return;
     lyricsService.saveUserLyrics(track.id, customText);
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 2000);
     const updated = lyricsService.getUserLyrics(track.id);
     setLyrics(updated);
-    setSavedSuccess(true);
     setActiveTab('lyrics');
-    setTimeout(() => setSavedSuccess(false), 2500);
   };
 
   const handleOpenGenius = () => {
-    const q = `${lyricsService.cleanArtist(track.artist)} ${lyricsService.cleanTitle(track.title)}`;
-    window.open(`https://genius.com/search?q=${encodeURIComponent(q)}`, '_blank');
+    const query = encodeURIComponent(`${track.artist} ${track.title} lyrics`);
+    const url = `https://genius.com/search?q=${query}`;
+    if ((window as any).electronAPI?.openExternal) {
+      (window as any).electronAPI.openExternal(url);
+    } else {
+      window.open(url, '_blank');
+    }
   };
 
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in select-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-2xl h-[700px] flex flex-col rounded-sc border border-sc-border bg-[#141414]/95 shadow-2xl overflow-hidden"
+        className="relative w-full max-w-2xl h-[85vh] rounded-2xl border border-sc-border bg-[#141414] shadow-2xl flex flex-col overflow-hidden text-white"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-sc-border px-6 py-4 bg-[#181818]/90">
-          <div className="flex items-center gap-3 overflow-hidden">
+          <div className="flex items-center gap-3.5 min-w-0">
             <img
-              src={track.artwork || '/favicon.png'}
+              src={track.artwork}
               alt={track.title}
-              className="h-11 w-11 rounded-sc object-cover border border-sc-border shrink-0"
+              className="h-12 w-12 rounded-sc object-cover border border-sc-border shrink-0 shadow-lg"
             />
             <div className="min-w-0">
-              <h3 className="text-sm font-bold text-white truncate flex items-center gap-2">
-                {track.title}
-                {lyrics?.synced && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-sc-accent text-white font-extrabold uppercase tracking-wider">
-                    Synced
-                  </span>
-                )}
-              </h3>
+              <h3 className="font-bold text-sm text-white truncate max-w-md">{track.title}</h3>
               <p className="text-xs text-sc-text-secondary truncate">{track.artist}</p>
             </div>
           </div>
@@ -146,7 +145,7 @@ export default function LyricsModal({
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="text-sc-text-secondary hover:text-white transition-colors p-1"
+              className="rounded-full p-2 text-sc-text-secondary hover:bg-sc-surface hover:text-white transition-colors"
             >
               <X size={20} />
             </button>
@@ -164,7 +163,7 @@ export default function LyricsModal({
             }`}
           >
             <Mic2 size={13} />
-            Lyrics {lyrics ? `(${lyrics.lines.length} lines)` : ''}
+            {t('tabLyrics')} {lyrics ? `(${lyrics.lines.length})` : ''}
           </button>
 
           {track.description && (
@@ -177,7 +176,7 @@ export default function LyricsModal({
               }`}
             >
               <FileText size={13} />
-              SoundCloud Description
+              {t('tabDescription')}
             </button>
           )}
 
@@ -190,16 +189,15 @@ export default function LyricsModal({
             }`}
           >
             <Edit3 size={13} />
-            Custom Lyrics
+            {t('tabEditor')}
           </button>
 
           {activeTab === 'lyrics' && lyrics && (
             <div className="ml-auto flex items-center gap-1 py-1.5">
-              <span className="text-[11px] text-sc-text-secondary mr-1">Синхронизация:</span>
+              <span className="text-[11px] text-sc-text-secondary mr-1">{t('syncDelay')}</span>
               <button
                 onClick={() => handleAdjustOffset(-0.25)}
                 className="px-2 py-0.5 rounded bg-[#1c1c1c] border border-sc-border text-[10px] font-semibold text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors"
-                title="Отодвинуть текст назад (-0.25с)"
               >
                 -0.25s
               </button>
@@ -209,7 +207,6 @@ export default function LyricsModal({
               <button
                 onClick={() => handleAdjustOffset(0.25)}
                 className="px-2 py-0.5 rounded bg-[#1c1c1c] border border-sc-border text-[10px] font-semibold text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors"
-                title="Подать текст раньше (+0.25с)"
               >
                 +0.25s
               </button>
@@ -217,9 +214,8 @@ export default function LyricsModal({
                 <button
                   onClick={handleResetOffset}
                   className="text-[10px] text-sc-text-secondary hover:text-white ml-1 underline cursor-pointer"
-                  title="Сбросить на значение по умолчанию (+0.45s)"
                 >
-                  Сброс
+                  {t('resetOffset')}
                 </button>
               )}
             </div>
@@ -234,21 +230,21 @@ export default function LyricsModal({
           {loading ? (
             <div className="flex flex-col items-center justify-center h-full text-sc-text-secondary py-20">
               <Loader2 size={32} className="animate-spin text-sc-accent mb-3" />
-              <p className="text-sm font-medium">Resolving lyrics & author notes...</p>
+              <p className="text-sm font-medium">{t('connecting')}</p>
             </div>
           ) : activeTab === 'editor' ? (
             <div className="space-y-4 max-w-lg mx-auto py-2">
               <div>
-                <h4 className="text-sm font-bold text-white mb-1">Add or Edit Lyrics for this Track</h4>
+                <h4 className="text-sm font-bold text-white mb-1">{t('tabEditor')}</h4>
                 <p className="text-xs text-sc-text-secondary">
-                  Paste the lyrics or stanzas below. They will be stored in your local library and synchronized with playback.
+                  {t('lyricsTitle')}
                 </p>
               </div>
 
               <textarea
                 value={customText}
                 onChange={(e) => setCustomText(e.target.value)}
-                placeholder="[Verse 1]&#10;Paste lyrics line by line..."
+                placeholder="[00:15.00] Lyrics line 1..."
                 rows={12}
                 className="w-full rounded-sc border border-sc-border bg-[#181818] p-3 text-xs text-white placeholder:text-sc-text-secondary/50 focus:border-sc-accent focus:outline-none font-sans leading-relaxed"
               />
@@ -259,10 +255,10 @@ export default function LyricsModal({
                   className="rounded-sc bg-sc-accent px-5 py-2 text-xs font-bold text-white hover:bg-sc-accent-hover transition-colors flex items-center gap-2 shadow-lg shadow-sc-accent/20"
                 >
                   <Check size={14} />
-                  Save Lyrics
+                  {t('saveUserLyrics')}
                 </button>
                 {savedSuccess && (
-                  <span className="text-xs text-emerald-400 font-semibold">Saved successfully!</span>
+                  <span className="text-xs text-emerald-400 font-semibold">{t('userLyricsSaved')}</span>
                 )}
               </div>
             </div>
@@ -270,15 +266,11 @@ export default function LyricsModal({
             <div className="max-w-xl mx-auto py-4 text-left space-y-4">
               <div className="p-4 rounded-sc border border-sc-border bg-[#181818]">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-sc-accent mb-2">
-                  Official Track Description from {track.artist}
+                  {track.artist}
                 </h4>
                 <p className="text-xs text-[#dddddd] whitespace-pre-wrap leading-relaxed font-sans">
                   {track.description}
                 </p>
-              </div>
-              <div className="flex items-center gap-3 text-xs text-sc-text-secondary">
-                {track.genre && <span>Genre: <strong className="text-white">{track.genre}</strong></span>}
-                {track.plays && <span>&bull; Plays: <strong className="text-white">{track.plays}</strong></span>}
               </div>
             </div>
           ) : !lyrics || lyrics.lines.length === 0 ? (
@@ -286,19 +278,15 @@ export default function LyricsModal({
               <div className="w-14 h-14 rounded-full bg-[#1e1e1e] border border-sc-border flex items-center justify-center text-sc-accent mb-4">
                 <Mic2 size={24} />
               </div>
-              <h3 className="text-base font-bold text-white mb-1">Lyrics Not Found Online</h3>
-              <p className="text-xs text-sc-text-secondary mb-6 leading-relaxed">
-                Independent and underground SoundCloud tracks may not be listed on international lyric servers.
-                You can search on Genius or paste your own lyrics.
-              </p>
+              <h3 className="text-base font-bold text-white mb-1">{t('noLyricsAvailable')}</h3>
 
-              <div className="flex flex-wrap items-center justify-center gap-3">
+              <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
                 <button
                   onClick={handleOpenGenius}
                   className="rounded-sc border border-sc-border bg-sc-surface px-4 py-2 text-xs font-semibold text-white hover:border-sc-accent hover:text-sc-accent transition-colors flex items-center gap-2"
                 >
                   <ExternalLink size={13} />
-                  Search on Genius
+                  Genius
                 </button>
 
                 <button
@@ -306,7 +294,7 @@ export default function LyricsModal({
                   className="rounded-sc bg-sc-accent px-4 py-2 text-xs font-bold text-white hover:bg-sc-accent-hover transition-colors flex items-center gap-2 shadow-md shadow-sc-accent/20"
                 >
                   <Edit3 size={13} />
-                  Add Custom Lyrics
+                  {t('tabEditor')}
                 </button>
               </div>
             </div>
@@ -341,7 +329,7 @@ export default function LyricsModal({
         <div className="border-t border-sc-border px-6 py-3 bg-[#111111] flex items-center justify-between text-[11px] text-sc-text-secondary">
           <span className="flex items-center gap-1.5">
             <Music2 size={13} className="text-sc-accent" />
-            {lyrics?.synced ? 'Click any line to jump to that moment' : 'SoundCloud Music Companion'}
+            SoundCloud Desktop
           </span>
           <div className="flex items-center gap-3">
             <button

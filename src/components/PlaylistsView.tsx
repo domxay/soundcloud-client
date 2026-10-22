@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Playlist, Track } from '@/types';
 import { soundcloudApi } from '@/services/api';
+import { useI18n } from '@/services/i18n';
 import { Play, ListMusic, Sparkles, Loader2, RefreshCw } from 'lucide-react';
 import TrackList from './TrackList';
 
@@ -27,6 +28,7 @@ export default function PlaylistsView({
   onSelectPlaylist,
   onOpenComments,
 }: PlaylistsViewProps) {
+  const { t } = useI18n();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [activeCategory, setActiveCategory] = useState('All');
   const [loading, setLoading] = useState(false);
@@ -58,44 +60,29 @@ export default function PlaylistsView({
     return playlists.filter((p) => {
       if (!p || !p.title) return false;
       const lower = p.title.trim().toLowerCase();
-
-      // Exclude automated track radio stations
-      if (
-        lower.startsWith('related tracks:') ||
-        lower.startsWith('station:') ||
-        lower.startsWith('stations based on') ||
-        String(p.id).includes('track-station')
-      ) {
+      if (seenIds.has(p.id) || seenTitles.has(lower)) {
         return false;
       }
-
-      if (seenIds.has(p.id)) return false;
-
-      const norm = lower
-        .replace(/^(full\s+playlist|playlist\s*:?)/i, '')
-        .replace(/[^a-z0-9а-яё]/gi, '')
-        .trim();
-
-      if (norm && seenTitles.has(norm)) return false;
-
       seenIds.add(p.id);
-      if (norm) seenTitles.add(norm);
+      seenTitles.add(lower);
       return true;
     });
   }, [playlists]);
 
   const filteredPlaylists = useMemo(() => {
+    if (activeCategory === 'All') return deduplicatedPlaylists;
+
     return deduplicatedPlaylists.filter((p) => {
-      if (activeCategory === 'All') return true;
-      const title = p.title.toLowerCase();
+      const title = (p.title || '').toLowerCase();
       const artist = (p.artist || '').toLowerCase();
 
       if (activeCategory === 'Electronic') {
         return (
-          title.includes('electro') ||
-          title.includes('techno') ||
           title.includes('edm') ||
           title.includes('dance') ||
+          title.includes('electro') ||
+          title.includes('techno') ||
+          title.includes('bass') ||
           title.includes('phonk') ||
           title.includes('hardtekk') ||
           title.includes('dubstep') ||
@@ -202,7 +189,7 @@ export default function PlaylistsView({
           onClick={() => setSelectedPlaylist(null)}
           className="flex items-center gap-2 text-xs font-semibold text-sc-text-secondary hover:text-white transition-colors"
         >
-          &larr; Back to all playlists
+          &larr; {t('backToPlaylists')}
         </button>
 
         <div className="flex flex-col md:flex-row gap-6 items-center md:items-end rounded-sc border border-sc-border bg-sc-surface p-6">
@@ -220,13 +207,13 @@ export default function PlaylistsView({
 
           <div className="flex-1 space-y-2 text-center md:text-left">
             <span className="text-[11px] font-bold uppercase tracking-wider text-sc-accent">
-              Curated Playlist
+              {t('curatedPlaylistBadge')}
             </span>
             <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
               {selectedPlaylist.title}
             </h1>
             <p className="text-xs text-sc-text-secondary">
-              By <strong className="text-white">{selectedPlaylist.artist}</strong> &bull; {selectedPlaylist.tracks.length} tracks
+              {t('curatedBy')} <strong className="text-white">{selectedPlaylist.artist}</strong> &bull; {selectedPlaylist.tracks.length} {t('tracksCount')}
             </p>
             {selectedPlaylist.tracks.length > 0 && (
               <div className="pt-2">
@@ -235,7 +222,7 @@ export default function PlaylistsView({
                   className="inline-flex items-center gap-2 rounded-sc bg-sc-accent px-5 py-2 text-xs font-bold text-white hover:bg-sc-accent-hover transition-colors shadow-lg shadow-sc-accent/25"
                 >
                   <Play size={14} fill="white" />
-                  Play All
+                  {t('playAll')}
                 </button>
               </div>
             )}
@@ -262,10 +249,10 @@ export default function PlaylistsView({
         <div>
           <div className="flex items-center gap-2 text-sc-accent">
             <Sparkles size={18} />
-            <h1 className="text-xl font-bold tracking-tight text-white">Playlists & Curated Mixes</h1>
+            <h1 className="text-xl font-bold tracking-tight text-white">{t('playlistsViewTitle')}</h1>
           </div>
           <p className="text-xs text-sc-text-secondary mt-1">
-            Real-time trending and curated albums from SoundCloud official feeds
+            {t('playlistsViewSubtitle')}
           </p>
         </div>
 
@@ -275,7 +262,7 @@ export default function PlaylistsView({
           className="flex items-center gap-2 rounded-sc border border-sc-border bg-sc-surface px-3 py-1.5 text-xs font-semibold text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors self-start sm:self-auto"
         >
           <RefreshCw size={13} className={loading ? 'animate-spin text-sc-accent' : ''} />
-          <span>Refresh</span>
+          <span>{t('refreshPlaylists')}</span>
         </button>
       </div>
 
@@ -298,11 +285,11 @@ export default function PlaylistsView({
       {loading && playlists.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-sc-text-secondary">
           <Loader2 size={32} className="animate-spin text-sc-accent mb-3" />
-          <p className="text-xs">Loading SoundCloud playlists...</p>
+          <p className="text-xs">{t('loadingLibrary')}</p>
         </div>
       ) : filteredPlaylists.length === 0 ? (
         <div className="text-center py-20 text-xs text-sc-text-secondary border border-dashed border-sc-border rounded-sc">
-          No playlists found for category "{activeCategory}".
+          {t('noPlaylistsCategory')}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -328,7 +315,7 @@ export default function PlaylistsView({
                 <button
                   onClick={(e) => handlePlayFirst(e, p)}
                   className="absolute bottom-2 right-2 h-9 w-9 rounded-full bg-sc-accent text-white flex items-center justify-center shadow-xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all hover:scale-110"
-                  title="Play Playlist"
+                  title={t('playAll')}
                 >
                   <Play size={15} fill="white" className="ml-0.5" />
                 </button>
@@ -339,10 +326,10 @@ export default function PlaylistsView({
                   {p.title}
                 </h3>
                 <p className="text-[11px] text-sc-text-secondary truncate mt-0.5">
-                  {p.artist === 'New!' || !p.artist ? 'SoundCloud Editorial' : p.artist}
+                  {p.artist === 'New!' || !p.artist ? 'SoundCloud' : p.artist}
                 </p>
                 <div className="mt-2 flex items-center justify-between text-[10px] text-sc-text-secondary/80">
-                  <span>{p.tracks.length > 0 ? `${p.tracks.length} tracks` : 'Full Playlist'}</span>
+                  <span>{p.tracks.length > 0 ? `${p.tracks.length} ${t('tracksCount')}` : t('playlists')}</span>
                   <span className="text-sc-accent font-medium">SoundCloud</span>
                 </div>
               </div>

@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { Track, Comment } from '@/types';
 import { formatTime } from '@/services/utils';
+import { useI18n } from '@/services/i18n';
 import Waveform from './Waveform';
 
 interface PlayerBarProps {
@@ -40,6 +41,8 @@ export default function PlayerBar({
   onOpenComments,
   onOpenLyrics,
 }: PlayerBarProps) {
+  const { t } = useI18n();
+
   if (!track) return null;
 
   return (
@@ -51,18 +54,18 @@ export default function PlayerBar({
           <p className="truncate text-xs text-sc-text-secondary">{track.artist}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2 pl-1">
-          <button onClick={onLike} className={`transition-colors hover:text-sc-accent ${liked ? 'text-sc-accent' : 'text-sc-text-secondary'}`} title="Like">
+          <button onClick={onLike} className={`transition-colors hover:text-sc-accent ${liked ? 'text-sc-accent' : 'text-sc-text-secondary'}`} title={liked ? t('trackUnliked') : t('trackLiked')}>
             <Heart size={16} fill={liked ? 'var(--sc-accent)' : 'none'} />
           </button>
-          <button onClick={onOpenComments} className="text-sc-text-secondary transition-colors hover:text-sc-accent" title="Comments">
+          <button onClick={onOpenComments} className="text-sc-text-secondary transition-colors hover:text-sc-accent" title={t('comments')}>
             <MessageSquare size={16} />
           </button>
           {onOpenLyrics && (
-            <button onClick={onOpenLyrics} className="text-sc-text-secondary transition-colors hover:text-sc-accent" title="Lyrics (LRCLIB)">
+            <button onClick={onOpenLyrics} className="text-sc-text-secondary transition-colors hover:text-sc-accent" title={t('lyrics')}>
               <Mic2 size={16} />
             </button>
           )}
-          <button onClick={onDownload} disabled={downloading} className="text-sc-text-secondary transition-colors hover:text-sc-accent disabled:opacity-60" title="Download">
+          <button onClick={onDownload} disabled={downloading} className="text-sc-text-secondary transition-colors hover:text-sc-accent disabled:opacity-60" title={t('download')}>
             {downloading ? <Loader2 size={16} className="animate-spin-slow text-sc-accent" /> : <Download size={16} />}
           </button>
         </div>
@@ -70,23 +73,23 @@ export default function PlayerBar({
 
       <div className="flex flex-1 flex-col items-center gap-1.5">
         <div className="flex items-center gap-4">
-          <button onClick={onShuffle} className={`transition-colors ${shuffle ? 'text-sc-accent' : 'text-sc-text-secondary hover:text-white'}`} title="Shuffle">
+          <button onClick={onShuffle} className={`transition-colors ${shuffle ? 'text-sc-accent' : 'text-sc-text-secondary hover:text-white'}`} title={t('shuffle')}>
             <Shuffle size={15} />
           </button>
-          <button onClick={onPrev} className="text-sc-text-secondary transition-colors hover:text-white" title="Previous">
+          <button onClick={onPrev} className="text-sc-text-secondary transition-colors hover:text-white" title={t('previous')}>
             <SkipBack size={18} fill="currentColor" />
           </button>
           <button
             onClick={onPlayPause}
             className="flex h-9 w-9 items-center justify-center rounded-full bg-sc-accent text-white transition-colors hover:bg-sc-accent-hover shadow-md shadow-sc-accent/30"
-            title={isPlaying ? 'Pause' : 'Play'}
+            title={isPlaying ? t('pause') : t('play')}
           >
             {isPlaying ? <Pause size={17} fill="white" /> : <Play size={17} fill="white" className="ml-0.5" />}
           </button>
-          <button onClick={onNext} className="text-sc-text-secondary transition-colors hover:text-white" title="Next">
+          <button onClick={onNext} className="text-sc-text-secondary transition-colors hover:text-white" title={t('next')}>
             <SkipForward size={18} fill="currentColor" />
           </button>
-          <button onClick={onRepeat} className={`transition-colors ${repeat ? 'text-sc-accent' : 'text-sc-text-secondary hover:text-white'}`} title="Repeat">
+          <button onClick={onRepeat} className={`transition-colors ${repeat ? 'text-sc-accent' : 'text-sc-text-secondary hover:text-white'}`} title={repeat ? t('repeatOne') : t('repeatAll')}>
             <Repeat size={15} />
           </button>
         </div>
@@ -125,7 +128,7 @@ export default function PlayerBar({
             }}
           />
         </div>
-        <button onClick={onOpenDownloads} className="text-sc-text-secondary transition-colors hover:text-white" title="Downloads">
+        <button onClick={onOpenDownloads} className="text-sc-text-secondary transition-colors hover:text-white" title={t('downloads')}>
           <ListMusic size={18} />
         </button>
       </div>
