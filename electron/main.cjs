@@ -6,6 +6,14 @@ const http = require('http');
 const netSocket = require('net');
 const { pathToFileURL } = require('url');
 
+// Global process error handlers to prevent silent crashes
+process.on('uncaughtException', (err) => {
+  console.error('[Main] Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[Main] Unhandled Rejection:', reason);
+});
+
 // Register custom privileged scheme for streaming local MP4/WebM videos and images
 try {
   protocol.registerSchemesAsPrivileged([
@@ -36,10 +44,12 @@ if (!gotTheLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
       mainWindow.focus();
+    } else {
+      createWindow();
     }
   });
 }
@@ -109,11 +119,13 @@ function saveNetworkSettings(settings) {
 
 const __netSettings = loadNetworkSettings();
 if (__netSettings.dohEnabled !== false) {
-  app.commandLine.appendSwitch('enable-features', 'DnsOverHttps');
-  app.commandLine.appendSwitch(
-    'dns-over-https-templates',
-    'https://freedns.controld.com/p0 https://dns.adguard-dns.com/dns-query https://1.1.1.1/dns-query{?dns} https://8.8.8.8/dns-query{?dns}'
-  );
+  try {
+    app.commandLine.appendSwitch('enable-features', 'DnsOverHttps');
+    app.commandLine.appendSwitch(
+      'dns-over-https-templates',
+      'https://dns.adguard-dns.com/dns-query{?dns}'
+    );
+  } catch {}
 }
 
 // Automatic SoundCloud client_id scraping and caching
@@ -440,7 +452,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 700,
     frame: false,
-    show: true,
+    show: false,
     center: true,
     backgroundColor: '#121212',
     icon: path.join(__dirname, '../resources/icon.png'),
@@ -452,10 +464,15 @@ function createWindow() {
     },
   });
 
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-    mainWindow.focus();
-  });
+  const showWindowSafely = () => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  };
+
+  mainWindow.once('ready-to-show', showWindowSafely);
+  setTimeout(showWindowSafely, 1500);
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -493,6 +510,13 @@ function createWindow() {
   if (mainWindow.webContents.session) {
     mainWindow.webContents.session.setProxy(proxyConfig).catch(() => {});
   }
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.warn('[Main] Failed to load URL:', validatedURL, errorCode, errorDescription);
+    if (fs.existsSync(distPath) && validatedURL !== distPath) {
+      mainWindow.loadFile(distPath).catch(() => {});
+    }
+  });
 
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
@@ -961,70 +985,74 @@ ipcMain.handle('sc:relaunch-app', () => {
 });
 
 app.whenReady().then(async () => {
-  // Handle local-media:// protocol with range-request streaming for HTML5 <video> and <img>
   try {
-    protocol.handle('local-media', (request) => {
-      try {
-        const u = new URL(request.url);
-        let decoded = decodeURIComponent(u.pathname);
-        if (u.host && /^[a-zA-Z]$/.test(u.host)) {
-          decoded = u.host + ':' + decoded;
-        } else if (u.host && u.host !== 'asset' && u.host !== 'local' && u.host !== 'localhost') {
-          decoded = u.host + decoded;
+    // Handle local-media:// protocol with range-request streaming for HTML5 <video> and <img>
+    try {
+      protocol.handle('local-media', (request) => {
+        try {
+          const u = new URL(request.url);
+          let decoded = decodeURIComponent(u.pathname);
+          if (u.host && /^[a-zA-Z]$/.test(u.host)) {
+            decoded = u.host + ':' + decoded;
+          } else if (u.host && u.host !== 'asset' && u.host !== 'local' && u.host !== 'localhost') {
+            decoded = u.host + decoded;
+          }
+          if (/^\/[a-zA-Z]:/.test(decoded)) {
+            decoded = decoded.slice(1);
+          }
+          const targetPath = path.resolve(decoded);
+          if (!fs.existsSync(targetPath)) {
+            console.error('[local-media] File not found:', targetPath);
+            return new Response('File not found: ' + targetPath, { status: 404 });
+          }
+          const fileUrl = pathToFileURL(targetPath).toString();
+          return net.fetch(fileUrl);
+        } catch (err) {
+          return new Response('Media streaming error: ' + err.message, { status: 500 });
         }
-        if (/^\/[a-zA-Z]:/.test(decoded)) {
-          decoded = decoded.slice(1);
+      });
+    } catch (e) {
+      console.error('Failed to register local-media handler:', e);
+    }
+
+    createWindow();
+
+    // Try loading saved client ID
+    try {
+      const savedIdPath = path.join(app.getPath('userData'), 'client-id.json');
+      if (fs.existsSync(savedIdPath)) {
+        const idData = JSON.parse(fs.readFileSync(savedIdPath, 'utf-8'));
+        if (idData && idData.clientId) {
+          cachedClientId = idData.clientId;
         }
-        const targetPath = path.resolve(decoded);
-        if (!fs.existsSync(targetPath)) {
-          console.error('[local-media] File not found:', targetPath);
-          return new Response('File not found: ' + targetPath, { status: 404 });
-        }
-        const fileUrl = pathToFileURL(targetPath).toString();
-        return net.fetch(fileUrl);
-      } catch (err) {
-        return new Response('Media streaming error: ' + err.message, { status: 500 });
       }
-    });
-  } catch (e) {
-    console.error('Failed to register local-media handler:', e);
-  }
+    } catch {}
 
-  createWindow();
-
-  // Try loading saved client ID
-  try {
-    const savedIdPath = path.join(app.getPath('userData'), 'client-id.json');
-    if (fs.existsSync(savedIdPath)) {
-      const idData = JSON.parse(fs.readFileSync(savedIdPath, 'utf-8'));
-      if (idData && idData.clientId) {
-        cachedClientId = idData.clientId;
+    // Auto-detect and configure proxy
+    const saved = loadSavedProxy();
+    if (saved) {
+      currentProxyRule = saved;
+    } else {
+      const detected = await detectLocalProxy();
+      if (detected.success && detected.proxy) {
+        currentProxyRule = detected.proxy;
+        saveProxySettings(currentProxyRule);
       }
     }
-  } catch {}
 
-  // Auto-detect and configure proxy
-  const saved = loadSavedProxy();
-  if (saved) {
-    currentProxyRule = saved;
-  } else {
-    const detected = await detectLocalProxy();
-    if (detected.success && detected.proxy) {
-      currentProxyRule = detected.proxy;
-      saveProxySettings(currentProxyRule);
-    }
+    const cfg = currentProxyRule ? { proxyRules: currentProxyRule } : { mode: 'system' };
+    try {
+      if (session.defaultSession) await session.defaultSession.setProxy(cfg);
+    } catch {}
+    try {
+      if (mainWindow && mainWindow.webContents.session) await mainWindow.webContents.session.setProxy(cfg);
+    } catch {}
+
+    // Refresh client ID in background
+    fetchSoundCloudClientId().catch(() => {});
+  } catch (err) {
+    console.error('[Main] Startup error in whenReady:', err);
   }
-
-  const cfg = currentProxyRule ? { proxyRules: currentProxyRule } : { mode: 'system' };
-  try {
-    if (session.defaultSession) await session.defaultSession.setProxy(cfg);
-  } catch {}
-  try {
-    if (mainWindow && mainWindow.webContents.session) await mainWindow.webContents.session.setProxy(cfg);
-  } catch {}
-
-  // Refresh client ID in background
-  fetchSoundCloudClientId().catch(() => {});
 });
 
 app.on('window-all-closed', () => {
