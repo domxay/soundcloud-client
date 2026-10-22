@@ -35,7 +35,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('sc:overlay-command', listener);
     return () => ipcRenderer.removeListener('sc:overlay-command', listener);
   },
-  resizeOverlay: (width, height, newX) => ipcRenderer.invoke('sc:resize-overlay', { width, height, newX }),
+  getOverlayBounds: () => ipcRenderer.invoke('sc:get-overlay-bounds'),
+  resizeOverlay: (widthOrPayload, height, newX) => {
+    if (typeof widthOrPayload === 'object') {
+      return ipcRenderer.invoke('sc:resize-overlay', widthOrPayload);
+    }
+    return ipcRenderer.invoke('sc:resize-overlay', widthOrPayload, height, newX);
+  },
   moveOverlay: (deltaX, deltaY) => ipcRenderer.send('sc:overlay-move', { deltaX, deltaY }),
   restoreMainWindow: () => ipcRenderer.invoke('sc:restore-main-window'),
   toggleOverlay: (show) => ipcRenderer.invoke('sc:toggle-overlay', show),

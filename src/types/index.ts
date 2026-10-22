@@ -150,7 +150,12 @@ export interface ElectronAPI {
   onOverlayState: (callback: (state: OverlayState) => void) => () => void;
   sendOverlayAction: (action: string, payload?: any) => void;
   onOverlayCommand: (callback: (cmd: { action: string; payload?: any }) => void) => () => void;
-  resizeOverlay: (width: number, height: number, newX?: number) => Promise<void>;
+  getOverlayBounds?: () => Promise<{ x: number; y: number; width: number; height: number }>;
+  resizeOverlay: (
+    widthOrPayload: number | { width?: number; height?: number; x?: number; y?: number; newX?: number },
+    height?: number,
+    newX?: number
+  ) => Promise<void>;
   moveOverlay?: (deltaX: number, deltaY: number) => void;
   restoreMainWindow: () => Promise<void>;
   toggleOverlay: (show?: boolean) => Promise<boolean>;

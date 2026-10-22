@@ -377,8 +377,8 @@ function createOverlayWindow() {
 
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth } = primaryDisplay.workAreaSize;
-  const overlayWidth = 560;
-  const overlayHeight = 60;
+  const overlayWidth = 604;
+  const overlayHeight = 74;
   const posX = Math.round((screenWidth - overlayWidth) / 2);
   const posY = 14;
 
@@ -540,13 +540,51 @@ ipcMain.on('sc:overlay-move', (event, { deltaX, deltaY }) => {
   }
 });
 
-ipcMain.handle('sc:resize-overlay', (event, { width, height, newX }) => {
+ipcMain.handle('sc:get-overlay-bounds', () => {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     try {
-      const [currentX, currentY] = overlayWindow.getPosition();
-      const targetX = typeof newX === 'number' ? Math.round(newX) : currentX;
-      overlayWindow.setSize(Math.round(width), Math.round(height));
-      overlayWindow.setPosition(targetX, currentY);
+      return overlayWindow.getBounds();
+    } catch {}
+  }
+  return { x: 0, y: 14, width: 604, height: 74 };
+});
+
+ipcMain.handle('sc:resize-overlay', (event, payload, legacyHeight, legacyNewX) => {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    try {
+      const bounds = overlayWindow.getBounds();
+      let width = bounds.width;
+      let height = bounds.height;
+      let targetX = bounds.x;
+      let targetY = bounds.y;
+
+      if (typeof payload === 'number') {
+        width = payload;
+        if (typeof legacyHeight === 'number') height = legacyHeight;
+        if (typeof legacyNewX === 'number') {
+          targetX = legacyNewX;
+        } else {
+          targetX = Math.round(bounds.x - (width - bounds.width) / 2);
+        }
+      } else if (payload && typeof payload === 'object') {
+        if (typeof payload.width === 'number') width = payload.width;
+        if (typeof payload.height === 'number') height = payload.height;
+        if (typeof payload.x === 'number') {
+          targetX = payload.x;
+        } else if (typeof payload.newX === 'number') {
+          targetX = payload.newX;
+        } else if (typeof payload.width === 'number') {
+          targetX = Math.round(bounds.x - (width - bounds.width) / 2);
+        }
+        if (typeof payload.y === 'number') targetY = payload.y;
+      }
+
+      overlayWindow.setBounds({
+        x: Math.round(targetX),
+        y: Math.round(targetY),
+        width: Math.round(width),
+        height: Math.round(height),
+      });
     } catch {}
   }
 });
