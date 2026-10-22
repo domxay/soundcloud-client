@@ -136,8 +136,8 @@ export interface ElectronAPI {
   selectSaveFile: (defaultName: string) => Promise<string | null>;
   selectDownloadFolder: () => Promise<string | null>;
   selectBackgroundFile: () => Promise<any>;
-  setProxy: (rule: string) => Promise<{ success: boolean; proxy?: string; error?: string }>;
-  testProxy: (rule: string) => Promise<any>;
+  setProxy: (rule: string | null) => Promise<{ success: boolean; proxy?: string; error?: string }>;
+  testProxy: (rule?: string | null) => Promise<any>;
   detectLocalProxy: () => Promise<any>;
   getNetworkSettings: () => Promise<any>;
   setDoh: (enabled: boolean) => Promise<any>;
@@ -151,6 +151,7 @@ export interface ElectronAPI {
   sendOverlayAction: (action: string, payload?: any) => void;
   onOverlayCommand: (callback: (cmd: { action: string; payload?: any }) => void) => () => void;
   resizeOverlay: (width: number, height: number) => Promise<void>;
+  moveOverlay?: (deltaX: number, deltaY: number) => void;
   restoreMainWindow: () => Promise<void>;
   toggleOverlay: (show?: boolean) => Promise<boolean>;
 }
@@ -160,4 +161,3 @@ declare global {
     electronAPI?: ElectronAPI;
   }
 }
-

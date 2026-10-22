@@ -393,6 +393,7 @@ function createOverlayWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
+    movable: true,
     show: false,
     hasShadow: false,
     backgroundColor: '#00000000',
@@ -530,15 +531,30 @@ ipcMain.on('sc:overlay-action', (event, data) => {
   }
 });
 
+ipcMain.on('sc:overlay-move', (event, { deltaX, deltaY }) => {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    try {
+      const [currentX, currentY] = overlayWindow.getPosition();
+      overlayWindow.setPosition(Math.round(currentX + deltaX), Math.round(currentY + deltaY));
+    } catch {}
+  }
+});
+
 ipcMain.handle('sc:resize-overlay', (event, { width, height }) => {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     try {
+      const [currentX, currentY] = overlayWindow.getPosition();
+      const [currentWidth] = overlayWindow.getSize();
       const primaryDisplay = screen.getPrimaryDisplay();
       const { width: screenWidth } = primaryDisplay.workAreaSize;
-      const newX = Math.round((screenWidth - width) / 2);
-      const [, currentY] = overlayWindow.getPosition();
+      
+      const deltaW = Math.round(width) - currentWidth;
+      let nextX = Math.round(currentX - deltaW / 2);
+      if (nextX < 0) nextX = 0;
+      if (nextX + Math.round(width) > screenWidth) nextX = Math.max(0, screenWidth - Math.round(width));
+
       overlayWindow.setSize(Math.round(width), Math.round(height));
-      overlayWindow.setPosition(newX, currentY);
+      overlayWindow.setPosition(nextX, currentY);
     } catch {}
   }
 });
