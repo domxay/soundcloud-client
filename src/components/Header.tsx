@@ -15,7 +15,6 @@ import {
   ShieldCheck,
   ShieldAlert,
   RefreshCw,
-  PanelTop,
 } from 'lucide-react';
 import { authService } from '@/services/auth';
 
@@ -162,7 +161,7 @@ export default function Header({
       </nav>
 
       <div
-        className="relative flex-1 max-w-sm mx-2"
+        className="relative flex-1 min-w-0 max-w-sm mx-2"
         style={{ WebkitAppRegion: 'no-drag' } as any}
       >
         <Search
@@ -189,7 +188,7 @@ export default function Header({
         {proxyInfo && (
           <button
             onClick={() => navigate('/settings')}
-            className={`hidden md:flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-all border ${
+            className={`hidden lg:flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-all border ${
               proxyInfo.active
                 ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/60 hover:bg-emerald-900/40'
                 : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white'
@@ -201,13 +200,13 @@ export default function Header({
                 proxyInfo.active ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'
               }`}
             />
-            <span className="truncate max-w-[130px]">{proxyInfo.name}</span>
+            <span className="truncate max-w-[120px]">{proxyInfo.name}</span>
           </button>
         )}
 
         <button
           onClick={handleUploadClick}
-          className="hidden lg:flex items-center gap-1 text-xs font-medium text-[#999999] hover:text-white px-2 py-1 rounded transition-colors"
+          className="hidden xl:flex items-center gap-1 text-xs font-medium text-[#999999] hover:text-white px-2 py-1 rounded transition-colors"
           title="Upload to SoundCloud"
         >
           <Upload size={14} />
@@ -222,31 +221,16 @@ export default function Header({
               navigate('/settings');
             }
           }}
-          className="flex items-center gap-1 rounded border border-[#282828] bg-[#1a1a1a] px-2.5 py-1 text-xs font-semibold text-white hover:border-[#ff5500] hover:text-[#ff5500] transition-all shadow-sm"
+          className="flex items-center gap-1.5 rounded border border-[#282828] bg-[#1a1a1a] px-2.5 py-1 text-xs font-semibold text-white hover:border-[#ff5500] hover:text-[#ff5500] transition-all shadow-sm"
           title="Application Settings & Themes"
         >
           <Sliders size={13} className="text-[#ff5500]" />
           <span className="hidden sm:inline">Settings</span>
         </button>
 
-        {isElectron && (
-          <button
-            onClick={() => {
-              if (window.electronAPI?.toggleOverlay) {
-                window.electronAPI.toggleOverlay();
-              }
-            }}
-            className="flex items-center gap-1.5 rounded border border-[#282828] bg-[#1a1a1a] px-2.5 py-1 text-xs font-semibold text-zinc-300 hover:border-[#ff5500] hover:text-[#ff5500] transition-all shadow-sm"
-            title="Плавающий оверлей поверх всех окон (Dynamic Island)"
-          >
-            <PanelTop size={13} className="text-[#ff5500]" />
-            <span className="hidden xl:inline">Оверлей</span>
-          </button>
-        )}
-
         <button
           onClick={handleOpenTelegram}
-          className="hidden xl:flex items-center gap-1.5 rounded border border-[#282828] bg-[#1a1a1a] px-2.5 py-1 text-xs font-medium text-[#aaaaaa] hover:text-white hover:border-[#444444] transition-all shadow-sm"
+          className="hidden 2xl:flex items-center gap-1.5 rounded border border-[#282828] bg-[#1a1a1a] px-2.5 py-1 text-xs font-medium text-[#aaaaaa] hover:text-white hover:border-[#444444] transition-all shadow-sm"
           title="Community Channel"
         >
           <Send size={12} className="rotate-[-20deg] text-[#229ED9]" />
@@ -341,26 +325,26 @@ export default function Header({
 
       {isElectron && (
         <div
-          className="flex items-center border-l border-[#282828] pl-2 gap-0.5 shrink-0"
+          className="flex items-center border-l border-[#282828] pl-2 -mr-1 gap-0.5 shrink-0"
           style={{ WebkitAppRegion: 'no-drag' } as any}
         >
           <button
             onClick={handleMinimize}
-            className="flex h-7 w-7 items-center justify-center rounded text-[#888888] hover:bg-[#222222] hover:text-white transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded text-[#888888] hover:bg-[#222222] hover:text-white transition-colors"
             title="Minimize"
           >
             <Minus size={13} />
           </button>
           <button
             onClick={handleMaximize}
-            className="flex h-7 w-7 items-center justify-center rounded text-[#888888] hover:bg-[#222222] hover:text-white transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded text-[#888888] hover:bg-[#222222] hover:text-white transition-colors"
             title="Maximize"
           >
             <Square size={11} />
           </button>
           <button
             onClick={handleClose}
-            className="flex h-7 w-7 items-center justify-center rounded text-[#888888] hover:bg-[#e81123] hover:text-white transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded text-[#888888] hover:bg-[#e81123] hover:text-white transition-colors"
             title="Close"
           >
             <X size={13} />

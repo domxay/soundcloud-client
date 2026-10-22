@@ -457,18 +457,22 @@ function createWindow() {
   });
 
   mainWindow.on('minimize', () => {
-    if (cachedOverlayState && (cachedOverlayState.isPlaying || cachedOverlayState.track)) {
-      const win = createOverlayWindow();
-      win.showInactive();
-      win.setAlwaysOnTop(true, 'screen-saver');
-      if (cachedOverlayState) {
-        win.webContents.send('sc:overlay-state', cachedOverlayState);
-      }
+    const win = createOverlayWindow();
+    win.showInactive();
+    win.setAlwaysOnTop(true, 'screen-saver');
+    if (cachedOverlayState) {
+      win.webContents.send('sc:overlay-state', cachedOverlayState);
     }
   });
 
   mainWindow.on('restore', () => {
     if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.hide();
+    }
+  });
+
+  mainWindow.on('focus', () => {
+    if (mainWindow && mainWindow.isVisible() && !mainWindow.isMinimized() && overlayWindow && !overlayWindow.isDestroyed()) {
       overlayWindow.hide();
     }
   });
