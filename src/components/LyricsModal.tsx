@@ -27,7 +27,7 @@ export default function LyricsModal({
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [syncOffset, setSyncOffset] = useState<number>(() => {
     const saved = localStorage.getItem('sc_lyrics_sync_offset');
-    return saved !== null ? Number(saved) : 0.45;
+    return saved !== null ? Number(saved) : 0.85;
   });
   const activeLineRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -36,13 +36,15 @@ export default function LyricsModal({
     setSyncOffset((prev) => {
       const next = Math.round((prev + delta) * 100) / 100;
       localStorage.setItem('sc_lyrics_sync_offset', String(next));
+      window.dispatchEvent(new Event('storage'));
       return next;
     });
   };
 
   const handleResetOffset = () => {
-    setSyncOffset(0.45);
-    localStorage.setItem('sc_lyrics_sync_offset', '0.45');
+    setSyncOffset(0.85);
+    localStorage.setItem('sc_lyrics_sync_offset', '0.85');
+    window.dispatchEvent(new Event('storage'));
   };
 
   useEffect(() => {

@@ -79,10 +79,38 @@ function AppContent() {
     }
   }, []);
 
+  // Synchronized lyrics offset (default: 0.85s lead-in for smooth real-time highlight)
+  const [lyricsSyncOffset, setLyricsSyncOffset] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('sc_lyrics_sync_offset');
+      if (saved !== null) {
+        const val = parseFloat(saved);
+        if (!isNaN(val)) return val;
+      }
+    } catch {}
+    return 0.85;
+  });
+
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent | Event) => {
+      try {
+        const saved = localStorage.getItem('sc_lyrics_sync_offset');
+        if (saved !== null) {
+          const val = parseFloat(saved);
+          if (!isNaN(val)) setLyricsSyncOffset(val);
+        }
+      } catch {}
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
   // Fetch track lyrics in real time for desktop overlay and lyrics player
   useEffect(() => {
+    // Instantly wipe prior track's lyrics so overlay never holds stale text
+    setCurrentLyricsData(null);
+
     if (!currentTrack) {
-      setCurrentLyricsData(null);
       return;
     }
     let isCurrent = true;
@@ -100,15 +128,14 @@ function AppContent() {
     return () => {
       isCurrent = false;
     };
-  }, [currentTrack]);
+  }, [currentTrack?.id]);
 
   // Compute active lyrics line for synchronization
   const activeLyricInfo = useMemo(() => {
     if (!currentLyricsData?.lines || currentLyricsData.lines.length === 0) {
       return { activeLyric: '', nextLyric: '' };
     }
-    const offset = 0.45;
-    const t = currentTime + offset;
+    const t = currentTime + lyricsSyncOffset;
     let activeIdx = -1;
     for (let i = 0; i < currentLyricsData.lines.length; i++) {
       if (t >= currentLyricsData.lines[i].time) {
@@ -127,7 +154,7 @@ function AppContent() {
       activeLyric: '',
       nextLyric: currentLyricsData.lines[0]?.text || '',
     };
-  }, [currentLyricsData, currentTime]);
+  }, [currentLyricsData, currentTime, lyricsSyncOffset]);
 
   const handleNext = useCallback((forceSkipRepeat = true) => {
     let nextTrack = queueService.next(forceSkipRepeat);
