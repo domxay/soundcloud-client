@@ -13,18 +13,21 @@ import {
   Globe,
   CheckCircle2,
   AlertTriangle,
+  Languages,
 } from 'lucide-react';
 import { themeService, ThemeDefinition } from '@/services/theme';
 import { authService } from '@/services/auth';
 import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
+import { useI18n } from '@/services/i18n';
 
 interface SettingsViewProps {
   onOpenLogin: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenLogin }) => {
-  const [activeTab, setActiveTab] = useState('network');
+  const { lang, t, setLanguage } = useI18n();
+  const [activeTab, setActiveTab] = useState('language');
   const [currentTheme, setCurrentTheme] = useState<ThemeDefinition>(themeService.getTheme());
   const [themes] = useState<ThemeDefinition[]>(themeService.getAllThemes());
   const [dohEnabled, setDohEnabled] = useState(true);
@@ -97,13 +100,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenLogin }) => {
     const res = await (window as any).electronAPI.setProxy(rule);
     if (res && res.success) {
       setCurrentProxy(rule);
-      setProxyStatus(rule ? `Подключено: ${rule}` : 'Режим: Системный VPN / Авто');
+      setProxyStatus(rule ? `${t('connected')}: ${rule}` : t('directConnectionMode'));
       if (rule) {
         handleTestProxy(rule);
       }
       setTimeout(() => setProxyStatus(null), 4000);
     } else {
-      setProxyStatus('Ошибка подключения прокси');
+      setProxyStatus('Error applying proxy');
     }
   };
 
@@ -128,13 +131,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenLogin }) => {
     try {
       const res = await authService.syncSessionFromCookies();
       if (res.success) {
-        setSyncStatus('Сессия успешно синхронизирована из SoundCloud!');
+        setSyncStatus(t('loginSuccess'));
         setTimeout(() => window.location.reload(), 1000);
       } else {
-        setSyncStatus(res.error || 'Активная сессия в куках не найдена. Войдите через окно входа.');
+        setSyncStatus(res.error || 'No active session found.');
       }
     } catch (err: any) {
-      setSyncStatus(err?.message || 'Ошибка синхронизации');
+      setSyncStatus(err?.message || 'Sync error');
     } finally {
       setSyncingSession(false);
     }
@@ -155,22 +158,79 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenLogin }) => {
   };
 
   const tabs = [
-    { id: 'network', label: 'VPN и Обход блокировок' },
-    { id: 'appearance', label: 'Оформление (Темы)' },
-    { id: 'downloads', label: 'Загрузки' },
-    { id: 'account', label: 'Аккаунт и Сессия' },
+    { id: 'language', label: `${t('interfaceLanguage')} (${lang.toUpperCase()})` },
+    { id: 'network', label: t('proxyAndNetwork') },
+    { id: 'appearance', label: t('themes') },
+    { id: 'downloads', label: t('downloads') },
+    { id: 'account', label: t('profile') },
   ];
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-6 space-y-6">
       <div className="border-b border-[#242424] pb-4">
-        <h1 className="text-2xl font-bold text-white tracking-tight">Настройки</h1>
+        <h1 className="text-2xl font-bold text-white tracking-tight">{t('themeAndSettings')}</h1>
         <p className="text-xs text-[#888888] mt-1">
-          VPN обход ограничений, авто-сессия, темы интерфейса и загрузки.
+          {t('appearanceSubtitle')}
         </p>
       </div>
 
       <Tabs items={tabs} activeId={activeTab} onChange={setActiveTab} />
+
+      {activeTab === 'language' && (
+        <div className="space-y-6 bg-[#161616] p-6 rounded-lg border border-[#242424]">
+          <div>
+            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Languages size={18} className="text-[#ff5500]" />
+              <span>{t('chooseLanguage')}</span>
+            </h2>
+            <p className="text-xs text-[#888888] mt-1">
+              {t('languageHint')}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div
+              onClick={() => setLanguage('ru')}
+              className={`cursor-pointer rounded-lg border p-4 transition-all flex flex-col justify-between ${
+                lang === 'ru'
+                  ? 'border-[#ff5500] bg-[#ff5500]/10 shadow-lg'
+                  : 'border-[#282828] bg-[#1a1a1a] hover:border-[#ff5500]/60'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">🇷🇺</span>
+                  <span className="text-sm font-bold text-white">Русский</span>
+                </div>
+                {lang === 'ru' && <CheckCircle2 size={18} className="text-[#ff5500]" />}
+              </div>
+              <p className="text-xs text-[#888888]">
+                Полный русский интерфейс и оверлей
+              </p>
+            </div>
+
+            <div
+              onClick={() => setLanguage('en')}
+              className={`cursor-pointer rounded-lg border p-4 transition-all flex flex-col justify-between ${
+                lang === 'en'
+                  ? 'border-[#ff5500] bg-[#ff5500]/10 shadow-lg'
+                  : 'border-[#282828] bg-[#1a1a1a] hover:border-[#ff5500]/60'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">🇺🇸</span>
+                  <span className="text-sm font-bold text-white">English</span>
+                </div>
+                {lang === 'en' && <CheckCircle2 size={18} className="text-[#ff5500]" />}
+              </div>
+              <p className="text-xs text-[#888888]">
+                Complete English interface and desktop overlay
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {activeTab === 'network' && (
         <div className="space-y-6 bg-[#161616] p-6 rounded-lg border border-[#242424]">
@@ -178,10 +238,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenLogin }) => {
             <div>
               <h2 className="text-sm font-semibold text-white flex items-center gap-2">
                 <ShieldCheck size={18} className="text-[#ff5500]" />
-                <span>DNS over HTTPS (Безопасный DoH)</span>
+                <span>DNS over HTTPS (DoH)</span>
               </h2>
               <p className="text-xs text-[#888888] mt-1 leading-relaxed">
-                Обходит DNS-блокировки ТСПУ и провайдеров РФ через зашифрованные DNS-серверы (Control D, AdGuard, Cloudflare).
+                Control D, AdGuard, Cloudflare DNS.
               </p>
             </div>
             <Button
@@ -189,7 +249,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenLogin }) => {
               variant={dohEnabled ? 'primary' : 'secondary'}
               onClick={handleToggleDoh}
             >
-              {dohEnabled ? 'Включено' : 'Выключено'}
+              {dohEnabled ? t('connected') : t('cancel')}
             </Button>
           </div>
 
@@ -198,10 +258,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenLogin }) => {
               <div>
                 <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                   <Network size={18} className="text-[#ff5500]" />
-                  <span>Обнаруженные локальные прокси (Clash Verge / v2rayN / Sing-box)</span>
+                  <span>{t('bypassTitle')}</span>
                 </h3>
                 <p className="text-xs text-[#888888] mt-0.5">
-                  Приложение автоматически сканирует порты ваших клиентов обхода блокировок.
+                  {t('bypassSubtitle')}
                 </p>
               </div>
               <Button
@@ -210,7 +270,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenLogin }) => {
                 icon={<RefreshCw size={13} className={detecting ? 'animate-spin' : ''} />}
                 onClick={handleAutoDetectProxy}
               >
-                Сканировать
+                {detecting ? t('searchingProxy') : t('autoDetect')}
               </Button>
             </div>
 
@@ -223,134 +283,80 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenLogin }) => {
                       key={idx}
                       className={`flex items-center justify-between p-3.5 rounded-lg border transition-all ${
                         isCurrent
-                          ? 'bg-[#1e271e] border-emerald-600/70 shadow-sm'
-                          : 'bg-[#1b1b1b] border-[#2c2c2c] hover:border-[#3a3a3a]'
+                          ? 'border-emerald-500/60 bg-emerald-950/20'
+                          : 'border-[#282828] bg-[#1a1a1a]'
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         <span
-                          className={`h-2.5 w-2.5 rounded-full ${
+                          className={`w-2.5 h-2.5 rounded-full ${
                             isCurrent ? 'bg-emerald-400 animate-pulse' : 'bg-[#555]'
                           }`}
                         />
                         <div>
-                          <p className="text-xs font-bold text-white flex items-center gap-2">
-                            <span>{p.name || 'Local Proxy'}</span>
-                            {isCurrent && (
-                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-semibold">
-                                Активен
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-[11px] font-mono text-[#ff8533] mt-0.5">{p.proxy}</p>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-white">
+                              {p.name || 'Local Proxy'}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-[#888] font-mono">{p.proxy}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleTestProxy(p.proxy)}
-                        >
-                          Тест
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={isCurrent ? 'secondary' : 'primary'}
-                          onClick={() => handleApplyProxy(p.proxy)}
-                        >
-                          {isCurrent ? 'Подключен' : 'Подключить'}
-                        </Button>
-                      </div>
+
+                      <Button
+                        size="sm"
+                        variant={isCurrent ? 'primary' : 'secondary'}
+                        onClick={() => handleApplyProxy(p.proxy)}
+                      >
+                        {isCurrent ? t('connected') : t('connectToProxy')}
+                      </Button>
                     </div>
                   );
                 })}
               </div>
-            ) : (
-              <div className="p-3.5 rounded bg-[#1b1b1b] border border-[#2a2a2a] text-xs text-[#888888] mb-5">
-                Локальные порты прокси не найдены. Если вы используете системный VPN (Amnezia, WireGuard, Outline, TUN), выберите режим <strong>Системный VPN</strong> ниже.
-              </div>
-            )}
+            ) : null}
 
-            <div className="space-y-3 pt-2 border-t border-[#242424]">
-              <label className="text-xs font-semibold text-white">Адрес прокси вручную</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={proxyInput}
-                  onChange={(e) => setProxyInput(e.target.value)}
-                  placeholder="http://127.0.0.1:56234 или socks5://127.0.0.1:10808"
-                  className="flex-1 rounded border border-[#2e2e2e] bg-[#121212] px-3.5 py-2 text-xs text-white placeholder:text-[#555555] focus:border-[#ff5500] focus:outline-none font-mono"
-                />
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={testingProxy}
-                  icon={<Zap size={14} className={testingProxy ? 'animate-spin' : ''} />}
-                  onClick={() => handleTestProxy()}
-                >
-                  Проверить
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={proxyInput}
+                onChange={(e) => setProxyInput(e.target.value)}
+                placeholder="http://127.0.0.1:39706"
+                className="flex-1 rounded border border-[#2a2a2a] bg-[#1a1a1a] px-3 py-1.5 text-xs text-white placeholder:text-[#666] font-mono focus:border-[#ff5500] focus:outline-none"
+              />
+              <Button size="sm" variant="primary" onClick={() => handleApplyProxy(proxyInput)}>
+                {t('save')}
+              </Button>
+              {currentProxy && (
+                <Button size="sm" variant="danger" onClick={() => handleApplyProxy('')}>
+                  {t('resetProxy')}
                 </Button>
-                <Button size="sm" variant="secondary" onClick={() => handleApplyProxy(proxyInput)}>
-                  Применить
-                </Button>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  title="Использовать сетевой адаптер Windows / Системный VPN"
-                  onClick={() => handleApplyProxy('')}
-                >
-                  Системный VPN
-                </Button>
-              </div>
-
-              {testResult && (
-                <div
-                  className={`flex items-center gap-2 text-xs font-medium p-2.5 rounded border ${
-                    testResult.success
-                      ? 'bg-emerald-950/40 border-emerald-800 text-emerald-400'
-                      : 'bg-red-950/40 border-red-800 text-red-400'
-                  }`}
-                >
-                  {testResult.success ? (
-                    <>
-                      <CheckCircle2 size={15} className="shrink-0" />
-                      <span>Соединение с серверами SoundCloud успешно установлено (пинг: {testResult.latency}мс).</span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertTriangle size={15} className="shrink-0" />
-                      <span>Не удалось соединиться: {testResult.error || 'Ошибка таймаута'}. Убедитесь, что прокси запущен и включен режим Rule или Global.</span>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {proxyStatus && (
-                <p className="text-xs text-[#ff5500] font-medium">{proxyStatus}</p>
               )}
             </div>
+
+            {proxyStatus && (
+              <p className="text-xs text-emerald-400 mt-2 font-medium">
+                {proxyStatus}
+              </p>
+            )}
           </div>
         </div>
       )}
 
       {activeTab === 'appearance' && (
-        <div className="space-y-6">
+        <div className="space-y-6 bg-[#161616] p-6 rounded-lg border border-[#242424]">
           <div>
-            <h2 className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
-              <Palette size={16} className="text-[#ff5500]" />
-              <span>Темы оформления (11 пресетов)</span>
+            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Palette size={18} className="text-[#ff5500]" />
+              <span>{t('themes')}</span>
             </h2>
-            <p className="text-xs text-[#888888] mb-4">
-              Выберите цветовую схему для интерфейса плеера.
-            </p>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {themes.map((t) => {
-                const isSelected = currentTheme.id === t.id;
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
+              {themes.map((th) => {
+                const isSelected = currentTheme.id === th.id;
                 return (
                   <button
-                    key={t.id}
-                    onClick={() => handleSelectTheme(t.id)}
+                    key={th.id}
+                    onClick={() => handleSelectTheme(th.id)}
                     className={`flex flex-col p-3 rounded-lg border text-left transition-all relative ${
                       isSelected
                         ? 'border-[#ff5500] bg-[#1e1e1e] ring-1 ring-[#ff5500]'
@@ -360,18 +366,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenLogin }) => {
                     <div className="flex items-center gap-2 mb-2">
                       <span
                         className="w-4 h-4 rounded-full border border-black/40 shrink-0"
-                        style={{ backgroundColor: t.colors.accent }}
+                        style={{ backgroundColor: th.colors.accent }}
                       />
                       <span
                         className="w-4 h-4 rounded-full border border-black/40 shrink-0"
-                        style={{ backgroundColor: t.colors.bg }}
+                        style={{ backgroundColor: th.colors.bg }}
                       />
                       {isSelected && (
                         <Check size={14} className="text-[#ff5500] ml-auto" />
                       )}
                     </div>
                     <span className="text-xs font-semibold text-white truncate">
-                      {t.name}
+                      {th.name}
                     </span>
                   </button>
                 );
@@ -385,10 +391,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenLogin }) => {
         <div className="space-y-4 bg-[#161616] p-5 rounded-lg border border-[#242424]">
           <h2 className="text-sm font-semibold text-white flex items-center gap-2">
             <Download size={16} className="text-[#ff5500]" />
-            <span>Папка для скачивания треков</span>
+            <span>{t('downloadsTitle')}</span>
           </h2>
           <p className="text-xs text-[#888888]">
-            Аудиофайлы загружаются в оригинальном качестве без повторного сжатия с тегами и обложками.
+            {t('downloadsSubtitle')}
           </p>
 
           <div className="flex items-center gap-3 p-3 rounded bg-[#1e1e1e] border border-[#2a2a2a]">
@@ -397,10 +403,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenLogin }) => {
               {downloadFolder}
             </span>
             <Button size="sm" variant="secondary" onClick={handleChooseFolder}>
-              Изменить
+              {t('changeFolder')}
             </Button>
             <Button size="sm" variant="ghost" onClick={handleOpenFolder}>
-              Открыть папку
+              {t('openFolder')}
             </Button>
           </div>
         </div>
@@ -412,11 +418,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenLogin }) => {
             <div>
               <h2 className="text-sm font-semibold text-white flex items-center gap-2">
                 <User size={16} className="text-[#ff5500]" />
-                <span>Автообновление и синхронизация сессии</span>
+                <span>{t('profile')}</span>
               </h2>
-              <p className="text-xs text-[#888888] mt-0.5">
-                1-клик синхронизация без необходимости вручную искать токены в DevTools.
-              </p>
             </div>
             <Button
               size="sm"
@@ -425,7 +428,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenLogin }) => {
               icon={<RefreshCw size={13} className={syncingSession ? 'animate-spin' : ''} />}
               onClick={handleSyncSession}
             >
-              Синхронизировать сессию
+              {t('cookiesSync')}
             </Button>
           </div>
 
@@ -461,7 +464,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenLogin }) => {
                   variant="secondary"
                   onClick={onOpenLogin}
                 >
-                  Сменить аккаунт
+                  {t('switchAccount')}
                 </Button>
                 <Button
                   size="sm"
@@ -472,18 +475,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenLogin }) => {
                     window.location.reload();
                   }}
                 >
-                  Выйти
+                  {t('logout')}
                 </Button>
               </div>
             </div>
           ) : (
             <div className="space-y-3">
               <p className="text-xs text-[#888888]">
-                Войдите в аккаунт, чтобы слушать свои лайки, историю и стримы.
+                {t('loginNotice')}
               </p>
               <div className="flex gap-2">
                 <Button size="sm" variant="primary" onClick={onOpenLogin}>
-                  Окно входа SoundCloud
+                  {t('loginToSoundCloud')}
                 </Button>
               </div>
             </div>

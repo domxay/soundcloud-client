@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Track, Playlist, UserProfile } from '@/types';
 import { soundcloudApi } from '@/services/api';
+import { useI18n } from '@/services/i18n';
 import TrackList from '@/components/TrackList';
 
 interface ArtistViewProps {
@@ -40,6 +41,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
   onSelectPlaylist,
   onOpenComments,
 }) => {
+  const { t } = useI18n();
   const { query } = useParams<{ query: string }>();
   const navigate = useNavigate();
 
@@ -65,7 +67,6 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
         const decoded = decodeURIComponent(query);
         let profile: UserProfile | null = null;
 
-        // If numeric ID was passed in query
         if (/^\d+$/.test(decoded)) {
           profile = await soundcloudApi.getArtistById(decoded);
         } else {
@@ -76,8 +77,6 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
 
         if (profile) {
           setArtist(profile);
-
-          // Check following state in localStorage
           try {
             const followed = localStorage.getItem(`sc_followed_${profile.id}`);
             setIsFollowing(Boolean(followed));
@@ -89,14 +88,13 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
           ]);
 
           if (isMounted) {
-            setTracks(artistTracks);
-            setPlaylists(artistPlaylists);
+            setTracks(artistTracks || []);
+            setPlaylists(artistPlaylists || []);
           }
         } else {
-          // If profile could not be resolved directly, search tracks by this artist as fallback
           const searched = await soundcloudApi.searchTracks(decoded, 40);
           if (isMounted) {
-            setTracks(searched);
+            setTracks(searched || []);
             setArtist({
               id: Date.now(),
               username: decoded,
@@ -151,8 +149,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-sc-text-secondary">
         <Loader2 size={36} className="animate-spin text-sc-accent mb-3" />
-        <p className="text-sm font-semibold text-white">Loading Artist Profile...</p>
-        <p className="text-xs text-sc-text-secondary mt-1">Fetching discography and official feeds</p>
+        <p className="text-sm font-semibold text-white">{t('connecting')}</p>
       </div>
     );
   }
@@ -160,16 +157,16 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
   if (!artist && !loading) {
     return (
       <div className="p-8 max-w-4xl mx-auto text-center py-24">
-        <h2 className="text-xl font-bold text-white mb-2">Artist Not Found</h2>
+        <h2 className="text-xl font-bold text-white mb-2">{t('noSearchResults')}</h2>
         <p className="text-xs text-sc-text-secondary mb-6">
-          Could not find an artist profile matching "{query}".
+          {query}
         </p>
         <button
           onClick={() => navigate(-1)}
           className="rounded-sc bg-sc-accent px-5 py-2 text-xs font-bold text-white hover:bg-sc-accent-hover transition-colors inline-flex items-center gap-2"
         >
           <ArrowLeft size={14} />
-          Go Back
+          {t('backToTracks')}
         </button>
       </div>
     );
@@ -192,7 +189,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
         className="flex items-center gap-2 text-xs font-semibold text-sc-text-secondary hover:text-white transition-colors"
       >
         <ArrowLeft size={14} />
-        Back
+        {t('backToTracks')}
       </button>
 
       {/* Hero Header */}
@@ -237,7 +234,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
             <div className="space-y-2">
               <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-sc-accent">
-                  Artist &bull; SoundCloud
+                  SoundCloud
                 </span>
                 {artist?.verified && (
                   <span className="inline-flex items-center gap-1 rounded bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-400 border border-blue-500/20">
@@ -261,15 +258,15 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
                 {followersFormatted && (
                   <span className="flex items-center gap-1">
                     <Users size={13} />
-                    <strong className="text-white">{followersFormatted}</strong> followers
+                    <strong className="text-white">{followersFormatted}</strong> {t('followersCount')}
                   </span>
                 )}
                 <span>
-                  <strong className="text-white">{tracks.length}</strong> tracks
+                  <strong className="text-white">{tracks.length}</strong> {t('tracksCount')}
                 </span>
                 {playlists.length > 0 && (
                   <span>
-                    &bull; <strong className="text-white">{playlists.length}</strong> albums
+                    &bull; <strong className="text-white">{playlists.length}</strong> {t('playlists')}
                   </span>
                 )}
               </div>
@@ -284,7 +281,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
                 className="rounded-sc bg-sc-accent px-5 py-2.5 text-xs font-bold text-white hover:bg-sc-accent-hover transition-colors flex items-center gap-2 shadow-lg shadow-sc-accent/25"
               >
                 <Play size={15} fill="white" />
-                Play All Tracks
+                {t('playAll')}
               </button>
             )}
 
@@ -299,12 +296,12 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
               {isFollowing ? (
                 <>
                   <UserCheck size={14} />
-                  Following
+                  {t('followingArtist')}
                 </>
               ) : (
                 <>
                   <UserPlus size={14} />
-                  Follow
+                  {t('followArtist')}
                 </>
               )}
             </button>
@@ -312,7 +309,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
             <button
               onClick={handleShare}
               className="rounded-sc border border-sc-border bg-sc-surface p-2.5 text-xs font-semibold text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors"
-              title="Share Artist"
+              title={t('shareTrack')}
             >
               <Share2 size={15} />
             </button>
@@ -321,7 +318,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
               <button
                 onClick={() => window.open(artist.permalink_url, '_blank')}
                 className="rounded-sc border border-sc-border bg-sc-surface p-2.5 text-xs font-semibold text-sc-text-secondary hover:text-white hover:border-sc-accent transition-colors"
-                title="Open on official SoundCloud"
+                title={t('openOnWeb')}
               >
                 <ExternalLink size={15} />
               </button>
@@ -331,7 +328,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
 
         {copiedLink && (
           <div className="px-6 py-1.5 bg-emerald-950/80 border-t border-emerald-800 text-[11px] font-semibold text-emerald-400 text-center">
-            Artist link copied to clipboard!
+            {t('shareTrack')}
           </div>
         )}
       </div>
@@ -347,7 +344,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
           }`}
         >
           <Music size={14} />
-          Tracks ({tracks.length})
+          {t('artistTracks')} ({tracks.length})
         </button>
 
         {playlists.length > 0 && (
@@ -360,7 +357,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
             }`}
           >
             <ListMusic size={14} />
-            Albums & Playlists ({playlists.length})
+            {t('artistPlaylists')} ({playlists.length})
           </button>
         )}
 
@@ -374,7 +371,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
             }`}
           >
             <Disc3 size={14} />
-            About
+            {t('artistAbout')}
           </button>
         )}
       </div>
@@ -383,7 +380,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
       {activeTab === 'tracks' ? (
         tracks.length === 0 ? (
           <div className="text-center py-20 text-xs text-sc-text-secondary border border-dashed border-sc-border rounded-sc">
-            No public tracks found for this artist.
+            {t('noTracksFound')}
           </div>
         ) : (
           <TrackList
@@ -391,7 +388,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
             currentTrackId={currentTrackId}
             isPlaying={isPlaying}
             downloadingIds={downloadingIds}
-            onTrackPlay={(t) => onTrackPlay(t, tracks)}
+            onTrackPlay={(tr) => onTrackPlay(tr, tracks)}
             onLikeToggle={onLikeToggle}
             onDownload={onDownload}
             onOpenComments={onOpenComments}
@@ -429,14 +426,14 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
               </h4>
               <p className="text-[11px] text-sc-text-secondary truncate mt-0.5">{p.artist}</p>
               <span className="text-[10px] text-sc-accent font-medium mt-1 inline-block">
-                {p.tracks.length > 0 ? `${p.tracks.length} tracks` : 'Album'}
+                {p.tracks.length > 0 ? `${p.tracks.length} ${t('tracksCount')}` : t('playlists')}
               </span>
             </div>
           ))}
         </div>
       ) : (
         <div className="max-w-2xl rounded-sc border border-sc-border bg-sc-surface p-6 space-y-4">
-          <h3 className="text-sm font-bold text-white">Biography & Links</h3>
+          <h3 className="text-sm font-bold text-white">{t('artistAbout')}</h3>
           <p className="text-xs text-[#cccccc] leading-relaxed whitespace-pre-wrap font-sans">
             {artist?.description}
           </p>
@@ -448,7 +445,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
                 rel="noreferrer"
                 className="text-xs text-sc-accent hover:underline inline-flex items-center gap-1 font-semibold"
               >
-                Open full SoundCloud profile
+                {t('openOnWeb')}
                 <ExternalLink size={12} />
               </a>
             </div>

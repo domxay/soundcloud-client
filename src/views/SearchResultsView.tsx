@@ -8,6 +8,7 @@ import { TrackRow } from '@/components/ui/TrackRow';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { useI18n } from '@/services/i18n';
 
 interface SearchResultsViewProps {
   onPlayTrack: (track: Track, list?: Track[]) => void;
@@ -22,6 +23,7 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
   isPlaying,
   onLikeTrack,
 }) => {
+  const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const query = searchParams.get('q') || '';
@@ -63,8 +65,8 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
   }, [query]);
 
   const tabs = [
-    { id: 'tracks', label: 'Tracks', count: tracks.length },
-    { id: 'playlists', label: 'Playlists' },
+    { id: 'tracks', label: t('tabTracks'), count: tracks.length },
+    { id: 'playlists', label: t('tabPlaylists') },
   ];
 
   return (
@@ -72,11 +74,11 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
       <div className="border-b border-[#242424] pb-4">
         <h1 className="text-xl font-bold text-white flex items-center gap-2">
           <Search size={20} className="text-[#ff5500]" />
-          <span>Search results for:</span>
+          <span>{t('searchResultsFor')}</span>
           <span className="text-[#ff5500]">"{query}"</span>
         </h1>
         <p className="text-xs text-[#888888] mt-1">
-          Found {tracks.length} tracks matching your query.
+          {t('foundTracks')} {tracks.length}
         </p>
       </div>
 
@@ -110,8 +112,8 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
       ) : tracks.length === 0 ? (
         <EmptyState
           icon={<Music size={28} />}
-          title={`No tracks found for "${query}"`}
-          description="Check your spelling or try different keywords or artist names."
+          title={`${t('noSearchResults')} "${query}"`}
+          description={t('checkSpelling')}
         />
       ) : (
         <div className="space-y-1 bg-[#141414] rounded-lg border border-[#222222] p-2">

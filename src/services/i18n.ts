@@ -16,10 +16,14 @@ export const translations = {
     login: 'Войти',
     logout: 'Выйти',
     profile: 'Профиль',
-    syncCookies: 'Синхронизировать сессию',
+    syncCookies: 'Синхронизация',
+    syncBrowserCookies: 'Синхронизировать сессию браузера',
     connecting: 'Подключение...',
     connected: 'Подключено',
     directConnection: 'Прямое соединение',
+    minimize: 'Свернуть',
+    maximize: 'Развернуть',
+    close: 'Закрыть',
 
     // Player Bar & Controls
     play: 'Воспроизведение',
@@ -37,6 +41,22 @@ export const translations = {
     unmute: 'Включить звук',
     speed: 'Скорость',
     sleepTimer: 'Таймер сна',
+    equalizer: 'Эквалайзер',
+    equalizerPresets: 'Пресеты эквалайзера',
+    equalizerFlat: 'Обычный (Flat)',
+    equalizerBass: 'Усиление баса (Bass Boost)',
+    equalizerPhonk: 'Фонк и саб-бас (Phonk)',
+    equalizerTreble: 'Усиление высоких (Treble)',
+    equalizerVocal: 'Четкий вокал (Vocal)',
+    equalizerRock: 'Рок и динамика (Rock)',
+    timerOff: 'Выкл',
+    minShort: 'мин',
+    hoursShort: 'ч',
+    downloadPlaylistFree: 'Скачать плейлист (Бесплатно)',
+    playlistUpper: 'ПЛЕЙЛИСТ',
+    updated: 'Обновлено',
+    daysAgo: 'дней назад',
+    unlike: 'Убрать лайк',
     like: 'Лайк',
     trackLiked: 'Добавлено в любимые',
     trackUnliked: 'Удалено из любимых',
@@ -123,8 +143,11 @@ export const translations = {
 
     // Modals & Settings
     themeAndSettings: 'Настройки и темы',
+    appearanceAndNetwork: 'Внешний вид и сеть',
+    appearanceSubtitle: 'Цветовые темы, живые фоны и маршрутизация сети',
     interfaceLanguage: 'Язык интерфейса',
     chooseLanguage: 'Выберите язык интерфейса приложения',
+    languageHint: 'Мгновенное переключение языка интерфейса приложения и оверлея в рантайме',
     themes: 'Цветовые темы',
     customBackground: 'Пользовательский фон (GIF / Видео)',
     proxyAndNetwork: 'Прокси и маршрутизация сети',
@@ -136,6 +159,23 @@ export const translations = {
     languageSwitched: 'Язык изменен на Русский',
     builtInBypass: 'Встроенный обход блокировок (Bypass / DoH)',
     systemMode: 'Системный режим',
+    backgroundMedia: 'Фоновое медиа',
+    backgroundMediaDesc: 'Выберите видео (MP4, WebM), анимацию (GIF) или изображение',
+    resetToDefault: 'Сбросить фон',
+    chooseFileFromPc: 'Выбрать файл с ПК (GIF, Видео, Картинка)',
+    browseFilesPc: 'Обзор файлов на ПК',
+    directLinkUrl: 'Прямая ссылка / URL (GIF / MP4 / Картинка)',
+    applyUrl: 'Применить ссылку',
+    backgroundDimming: 'Затемнение фона',
+    backgroundBlur: 'Размытие фона (Blur)',
+    bypassTitle: 'Обход блокировок SoundCloud (Режим для РФ без системного VPN)',
+    bypassSubtitle: 'Слушайте музыку и скачивайте треки на полной скорости без стороннего VPN',
+    autoDetect: 'Авто-поиск',
+    searchingProxy: 'Поиск...',
+    clientDetected: 'Обнаружен активный клиент',
+    connectToProxy: 'Подключить',
+    directConnectionMode: 'Прямое подключение к сети',
+    resetProxy: 'Сбросить',
 
     // Auth & Login Modal
     authRequired: 'Для прослушивания музыки войдите в аккаунт SoundCloud',
@@ -193,6 +233,33 @@ export const translations = {
     likesCount: 'Лайков',
     openOnWeb: 'Открыть в веб-версии',
     switchAccount: 'Сменить аккаунт',
+
+    // Feed View
+    feedTitle: 'Стрим и Лента',
+    feedAuthSubtitle: 'Свежие треки от авторов, на которых вы подписаны, и персональные рекомендации.',
+    feedGuestSubtitle: 'Прямой стрим популярных новинок от авторов SoundCloud.',
+    signInForFeed: 'Войти для персональной ленты',
+    refreshFeed: 'Обновить ленту',
+    feedEmptyTitle: 'В вашей ленте пока тихо',
+    feedEmptyDesc: 'Подпишитесь на авторов или слушайте чарты, чтобы находить новые треки.',
+
+    // Search Results View
+    searchResultsFor: 'Результаты поиска по запросу:',
+    foundTracks: 'Найдено треков:',
+    noSearchResults: 'По запросу ничего не найдено',
+    checkSpelling: 'Проверьте правильность написания или попробуйте другое название.',
+    tabTracks: 'Треки',
+    tabPlaylists: 'Плейлисты',
+
+    // Track Page & Artist View
+    backToTracks: 'Назад',
+    shareTrack: 'Поделиться',
+    relatedTracks: 'Похожие треки',
+    artistAbout: 'Об авторе',
+    artistTracks: 'Треки автора',
+    artistPlaylists: 'Плейлисты автора',
+    followArtist: 'Подписаться',
+    followingArtist: 'Вы подписаны',
   },
   en: {
     // Navigation & Global Header
@@ -207,10 +274,14 @@ export const translations = {
     login: 'Log In',
     logout: 'Log Out',
     profile: 'Profile',
-    syncCookies: 'Sync Session Cookies',
+    syncCookies: 'Sync',
+    syncBrowserCookies: 'Sync Browser Session Cookies',
     connecting: 'Connecting...',
     connected: 'Connected',
     directConnection: 'Direct Mode',
+    minimize: 'Minimize',
+    maximize: 'Maximize',
+    close: 'Close',
 
     // Player Bar & Controls
     play: 'Play',
@@ -228,6 +299,22 @@ export const translations = {
     unmute: 'Unmute',
     speed: 'Playback Speed',
     sleepTimer: 'Sleep Timer',
+    equalizer: 'Equalizer',
+    equalizerPresets: 'Equalizer Presets',
+    equalizerFlat: 'Flat (Standard)',
+    equalizerBass: 'Bass Boost',
+    equalizerPhonk: 'Phonk & Sub-Bass',
+    equalizerTreble: 'Treble Boost',
+    equalizerVocal: 'Vocal Clarity',
+    equalizerRock: 'Rock & Dynamic',
+    timerOff: 'Off',
+    minShort: 'min',
+    hoursShort: 'hr',
+    downloadPlaylistFree: 'Download Playlist (Free)',
+    playlistUpper: 'PLAYLIST',
+    updated: 'Updated',
+    daysAgo: 'days ago',
+    unlike: 'Unlike',
     like: 'Like',
     trackLiked: 'Added to favorites',
     trackUnliked: 'Removed from favorites',
@@ -314,11 +401,14 @@ export const translations = {
 
     // Modals & Settings
     themeAndSettings: 'Settings & Appearance',
+    appearanceAndNetwork: 'Appearance & Network Settings',
+    appearanceSubtitle: 'Custom themes, ambient backgrounds, and network configuration',
     interfaceLanguage: 'Interface Language',
     chooseLanguage: 'Select client display language',
+    languageHint: 'Instant switching of application and desktop overlay language in runtime',
     themes: 'Color Themes',
     customBackground: 'Custom Background (GIF / Video)',
-    proxyAndNetwork: 'Proxy & Network Routing',
+    proxyAndNetwork: 'Network & Proxy Routing',
     save: 'Save',
     cancel: 'Cancel',
     applied: 'Applied',
@@ -327,6 +417,23 @@ export const translations = {
     languageSwitched: 'Language switched to English',
     builtInBypass: 'Built-in Network Bypass (DoH / Proxy)',
     systemMode: 'Direct / System',
+    backgroundMedia: 'Background Media',
+    backgroundMediaDesc: 'Select an animated GIF, MP4/WebM video, or high-res image',
+    resetToDefault: 'Reset to Default',
+    chooseFileFromPc: 'Choose File from PC (GIF, Video, Image)',
+    browseFilesPc: 'Browse Files on PC',
+    directLinkUrl: 'Direct Link / URL (GIF / MP4 / Image)',
+    applyUrl: 'Apply URL',
+    backgroundDimming: 'Background Dimming / Dark Overlay',
+    backgroundBlur: 'Background Blur',
+    bypassTitle: 'SoundCloud Network Routing & Bypass',
+    bypassSubtitle: 'Stream and download tracks at full speed without external system VPN',
+    autoDetect: 'Auto Detect',
+    searchingProxy: 'Searching...',
+    clientDetected: 'Active client detected',
+    connectToProxy: 'Connect',
+    directConnectionMode: 'Direct Connection Mode',
+    resetProxy: 'Reset',
 
     // Auth & Login Modal
     authRequired: 'SoundCloud login required for playback',
@@ -384,6 +491,33 @@ export const translations = {
     likesCount: 'Likes',
     openOnWeb: 'Open on SoundCloud',
     switchAccount: 'Switch Account',
+
+    // Feed View
+    feedTitle: 'Stream & Feed',
+    feedAuthSubtitle: 'Hear the latest tracks from creators you follow and your recommendations.',
+    feedGuestSubtitle: 'Trending live stream from SoundCloud creators.',
+    signInForFeed: 'Sign in for personalized feed',
+    refreshFeed: 'Refresh feed',
+    feedEmptyTitle: 'Your feed is currently quiet',
+    feedEmptyDesc: 'Follow creators or check trending music to discover new tracks.',
+
+    // Search Results View
+    searchResultsFor: 'Search results for:',
+    foundTracks: 'Found tracks:',
+    noSearchResults: 'No tracks found matching your query',
+    checkSpelling: 'Check your spelling or try different keywords or artist names.',
+    tabTracks: 'Tracks',
+    tabPlaylists: 'Playlists',
+
+    // Track Page & Artist View
+    backToTracks: 'Back',
+    shareTrack: 'Share',
+    relatedTracks: 'Related tracks',
+    artistAbout: 'About',
+    artistTracks: 'Tracks',
+    artistPlaylists: 'Playlists',
+    followArtist: 'Follow',
+    followingArtist: 'Following',
   },
 } as const;
 
@@ -392,6 +526,7 @@ export type TranslationKey = keyof typeof translations.ru;
 class I18nService {
   private currentLanguage: Language = 'ru';
   private listeners: Set<(lang: Language) => void> = new Set();
+  private channel: BroadcastChannel | null = null;
 
   constructor() {
     const saved = localStorage.getItem('sc_language') as Language;
@@ -401,16 +536,43 @@ class I18nService {
       const navLang = navigator.language.toLowerCase();
       this.currentLanguage = navLang.startsWith('ru') ? 'ru' : 'en';
     }
+
+    // Cross-window synchronization (Electron multi-window: main + overlay)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'sc_language' && (e.newValue === 'ru' || e.newValue === 'en')) {
+          this.setLanguageInternal(e.newValue as Language);
+        }
+      });
+
+      try {
+        this.channel = new BroadcastChannel('sc_i18n_channel');
+        this.channel.onmessage = (e) => {
+          if (e.data?.lang === 'ru' || e.data?.lang === 'en') {
+            this.setLanguageInternal(e.data.lang);
+          }
+        };
+      } catch {}
+    }
   }
 
   public getLanguage(): Language {
     return this.currentLanguage;
   }
 
+  private setLanguageInternal(lang: Language): void {
+    if (this.currentLanguage === lang) return;
+    this.currentLanguage = lang;
+    this.notify();
+  }
+
   public setLanguage(lang: Language): void {
     if (this.currentLanguage === lang) return;
     this.currentLanguage = lang;
     localStorage.setItem('sc_language', lang);
+    try {
+      this.channel?.postMessage({ lang });
+    } catch {}
     this.notify();
   }
 

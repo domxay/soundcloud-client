@@ -47,7 +47,7 @@ export default function Header({
           if (res && res.success) {
             setProxyInfo({ active: true, name: res.name || 'Clash/VPN' });
           } else {
-            setProxyInfo({ active: false, name: 'System / Direct' });
+            setProxyInfo({ active: false, name: 'Direct' });
           }
         } catch {
           setProxyInfo({ active: false, name: 'Direct' });
@@ -200,13 +200,19 @@ export default function Header({
 
         {proxyInfo && (
           <button
-            onClick={() => navigate('/settings')}
+            onClick={() => {
+              if (onOpenThemeSettings) {
+                onOpenThemeSettings();
+              } else {
+                navigate('/settings');
+              }
+            }}
             className={`hidden lg:flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-all border ${
               proxyInfo.active
                 ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/60 hover:bg-emerald-900/40'
                 : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white'
             }`}
-            title="VPN & Proxy Route Status — Click to configure"
+            title="Proxy Route"
           >
             <span
               className={`h-2 w-2 rounded-full ${
@@ -244,7 +250,7 @@ export default function Header({
         <button
           onClick={handleOpenTelegram}
           className="hidden 2xl:flex items-center gap-1.5 rounded border border-[#282828] bg-[#1a1a1a] px-2.5 py-1 text-xs font-medium text-[#aaaaaa] hover:text-white hover:border-[#444444] transition-all shadow-sm"
-          title="Community Channel"
+          title="Telegram"
         >
           <Send size={12} className="rotate-[-20deg] text-[#229ED9]" />
           <span>@codesand</span>
@@ -287,17 +293,21 @@ export default function Header({
                     className="w-full px-3.5 py-2 text-left text-xs text-[#cccccc] hover:bg-[#282828] hover:text-white flex items-center gap-2"
                   >
                     <User size={14} />
-                    Profile
+                    {t('profile')}
                   </button>
                   <button
                     onClick={() => {
                       setDropdownOpen(false);
-                      navigate('/settings');
+                      if (onOpenThemeSettings) {
+                        onOpenThemeSettings();
+                      } else {
+                        navigate('/settings');
+                      }
                     }}
                     className="w-full px-3.5 py-2 text-left text-xs text-[#cccccc] hover:bg-[#282828] hover:text-white flex items-center gap-2"
                   >
                     <Settings size={14} />
-                    Settings
+                    {t('settings')}
                   </button>
                   <div className="my-1 border-t border-[#2a2a2a]" />
                   <button
@@ -309,7 +319,7 @@ export default function Header({
                     className="w-full px-3.5 py-2 text-left text-xs text-red-400 hover:bg-[#282828] font-medium flex items-center gap-2"
                   >
                     <LogOut size={14} />
-                    Sign Out
+                    {t('logout')}
                   </button>
                 </div>
               </>
@@ -321,16 +331,16 @@ export default function Header({
               onClick={handleQuickSync}
               disabled={isSyncing}
               className="hidden sm:flex items-center gap-1.5 rounded border border-[#333] bg-[#1a1a1a] px-2.5 py-1.5 text-xs font-semibold text-[#ccc] hover:text-white hover:border-[#ff5500] transition-colors"
-              title="Синхронизировать сессию браузера"
+              title={t('syncBrowserCookies')}
             >
               <RefreshCw size={12} className={isSyncing ? 'animate-spin text-[#ff5500]' : ''} />
-              <span>Синхронизация</span>
+              <span>{t('syncCookies')}</span>
             </button>
             <button
               onClick={onOpenLogin}
               className="rounded bg-[#ff5500] px-3.5 py-1.5 text-xs font-bold text-white hover:bg-[#ff6600] active:bg-[#e64d00] transition-colors shadow-sm"
             >
-              Sign In
+              {t('login')}
             </button>
           </div>
         )}
@@ -344,21 +354,21 @@ export default function Header({
           <button
             onClick={handleMinimize}
             className="flex h-8 w-8 items-center justify-center rounded text-[#888888] hover:bg-[#222222] hover:text-white transition-colors"
-            title="Minimize"
+            title={t('minimize')}
           >
             <Minus size={13} />
           </button>
           <button
             onClick={handleMaximize}
             className="flex h-8 w-8 items-center justify-center rounded text-[#888888] hover:bg-[#222222] hover:text-white transition-colors"
-            title="Maximize"
+            title={t('maximize')}
           >
             <Square size={11} />
           </button>
           <button
             onClick={handleClose}
             className="flex h-8 w-8 items-center justify-center rounded text-[#888888] hover:bg-[#e81123] hover:text-white transition-colors"
-            title="Close"
+            title={t('close')}
           >
             <X size={13} />
           </button>

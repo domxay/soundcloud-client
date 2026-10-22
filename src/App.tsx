@@ -25,10 +25,12 @@ import { authService } from '@/services/auth';
 import { themeService, CustomBackground } from '@/services/theme';
 import { queueService } from '@/services/queue';
 import { lyricsService } from '@/services/lyrics';
+import { useI18n } from '@/services/i18n';
 import { CheckCircle2, Info, AlertCircle } from 'lucide-react';
 
 function AppContent() {
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   const [currentPlaylist, setCurrentPlaylist] = useState<Playlist>(emptyPlaylist);
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -180,7 +182,7 @@ function AppContent() {
         case 'play-pause':
           if (!authService.isAuthenticated()) {
             setIsLoginModalOpen(true);
-            addToast('Для воспроизведения музыки необходимо войти в аккаунт SoundCloud', 'error');
+            addToast(t('authRequired'), 'error');
             return;
           }
           if (currentTrack) {
@@ -240,7 +242,7 @@ function AppContent() {
         e.preventDefault();
         if (!authService.isAuthenticated()) {
           setIsLoginModalOpen(true);
-          addToast('Для воспроизведения музыки необходимо войти в аккаунт SoundCloud', 'error');
+          addToast(t('authRequired'), 'error');
           return;
         }
         audioService.togglePlay();
@@ -378,7 +380,7 @@ function AppContent() {
   const handleTrackPlay = (track: Track, list?: Track[]) => {
     if (!authService.isAuthenticated()) {
       setIsLoginModalOpen(true);
-      addToast('Для воспроизведения музыки необходимо войти в аккаунт SoundCloud', 'error');
+      addToast(t('authRequired'), 'error');
       return;
     }
 
@@ -405,7 +407,7 @@ function AppContent() {
   const handleSelectPlaylist = (p: Playlist) => {
     if (!authService.isAuthenticated()) {
       setIsLoginModalOpen(true);
-      addToast('Для воспроизведения плейлистов необходимо войти в аккаунт SoundCloud', 'error');
+      addToast(t('authRequired'), 'error');
       return;
     }
 
@@ -417,28 +419,28 @@ function AppContent() {
       setDuration(p.tracks[0].duration);
       audioService.playTrack(p.tracks[0]);
     }
-    addToast(`Playing playlist: ${p.title}`, 'info');
+    addToast(`${t('play')}: ${p.title}`, 'info');
   };
 
   const handleLikeToggle = (id: number) => {
     const isNowLiked = soundcloudApi.toggleLocalLike(id);
     const track = soundcloudApi.getTrack(id);
     const title = track ? track.title : 'Track';
-    addToast(isNowLiked ? `Added to Likes: ${title}` : `Removed from Likes: ${title}`, 'success');
+    addToast(isNowLiked ? `${t('trackLiked')}: ${title}` : `${t('trackUnliked')}: ${title}`, 'success');
   };
 
   const handleDownload = (id: number) => {
-    const track = soundcloudApi.getTrack(id) || tracks.find((t) => t.id === id);
+    const track = soundcloudApi.getTrack(id) || tracks.find((tr) => tr.id === id);
     if (track) {
       downloaderService.downloadTrack(track);
-      addToast(`Choose destination to save: ${track.title}`, 'info');
+      addToast(`${t('downloading')}: ${track.title}`, 'info');
     }
   };
 
   const handlePlayAll = () => {
     if (!authService.isAuthenticated()) {
       setIsLoginModalOpen(true);
-      addToast('Для воспроизведения музыки необходимо войти в аккаунт SoundCloud', 'error');
+      addToast(t('authRequired'), 'error');
       return;
     }
     if (tracks.length === 0) return;
@@ -690,7 +692,7 @@ function AppContent() {
                 />
                 {loading ? (
                   <div className="text-center py-20 text-[#888888]">
-                    Loading SoundCloud stream...
+                    {t('loadingChart')}
                   </div>
                 ) : (
                   <TrackList

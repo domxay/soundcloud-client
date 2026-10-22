@@ -8,6 +8,7 @@ import { TrackRow } from '@/components/ui/TrackRow';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { useI18n } from '@/services/i18n';
 
 interface TrackPageViewProps {
   onPlayTrack: (track: Track, list?: Track[]) => void;
@@ -24,6 +25,7 @@ export const TrackPageView: React.FC<TrackPageViewProps> = ({
   onLikeTrack,
   onDownloadTrack,
 }) => {
+  const { t } = useI18n();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [track, setTrack] = useState<Track | null>(null);
@@ -71,7 +73,7 @@ export const TrackPageView: React.FC<TrackPageViewProps> = ({
   useEffect(() => {
     if (!track?.artist) return;
     soundcloudApi.searchTracks(track.artist, 6).then((res) => {
-      setRelatedTracks(res.filter((t) => t.id !== track.id));
+      setRelatedTracks(res.filter((tr) => tr.id !== track.id));
     }).catch(() => {});
   }, [track?.artist, track?.id]);
 
@@ -116,7 +118,7 @@ export const TrackPageView: React.FC<TrackPageViewProps> = ({
         className="flex items-center gap-1.5 text-xs text-[#888888] hover:text-white transition-colors"
       >
         <ArrowLeft size={14} />
-        <span>Back</span>
+        <span>{t('backToTracks')}</span>
       </button>
 
       <div className="relative rounded-xl overflow-hidden bg-gradient-to-r from-[#201518] to-[#141414] border border-[#2a2a2a] p-6 shadow-xl">
@@ -176,7 +178,7 @@ export const TrackPageView: React.FC<TrackPageViewProps> = ({
             icon={<Heart size={15} className={track.liked ? 'fill-[#ff5500] text-[#ff5500]' : ''} />}
             onClick={() => onLikeTrack(track)}
           >
-            {track.liked ? 'Liked' : 'Like'}
+            {track.liked ? t('trackLiked') : t('like')}
           </Button>
           <Button
             size="sm"
@@ -184,7 +186,7 @@ export const TrackPageView: React.FC<TrackPageViewProps> = ({
             icon={<Download size={15} />}
             onClick={() => onDownloadTrack(track)}
           >
-            Download
+            {t('download')}
           </Button>
           <Button
             size="sm"
@@ -194,7 +196,7 @@ export const TrackPageView: React.FC<TrackPageViewProps> = ({
               navigator.clipboard?.writeText(window.location.href);
             }}
           >
-            Copy Link
+            {t('shareTrack')}
           </Button>
         </div>
       </div>
@@ -203,7 +205,7 @@ export const TrackPageView: React.FC<TrackPageViewProps> = ({
         <div className="md:col-span-2 space-y-4">
           <h2 className="text-base font-bold text-white flex items-center gap-2">
             <MessageSquare size={17} className="text-[#ff5500]" />
-            <span>Comments ({comments.length})</span>
+            <span>{t('commentsTitle')} ({comments.length})</span>
           </h2>
 
           <form onSubmit={handlePostComment} className="flex gap-2">
@@ -211,11 +213,11 @@ export const TrackPageView: React.FC<TrackPageViewProps> = ({
               type="text"
               value={commentInput}
               onChange={(e) => setCommentInput(e.target.value)}
-              placeholder="Write a comment..."
+              placeholder={t('writeComment')}
               className="flex-1 rounded border border-[#2e2e2e] bg-[#161616] px-3 py-2 text-xs text-white placeholder:text-[#666666] focus:border-[#ff5500] focus:outline-none"
             />
             <Button size="sm" variant="primary" type="submit">
-              Post
+              {t('sendComment')}
             </Button>
           </form>
 
@@ -230,9 +232,6 @@ export const TrackPageView: React.FC<TrackPageViewProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold text-white">{c.user.username}</span>
-                    <span className="text-[10px] text-[#666666]">
-                      at {Math.floor(c.timestamp / 60)}:{(c.timestamp % 60).toString().padStart(2, '0')}
-                    </span>
                   </div>
                   <p className="text-xs text-[#cccccc] mt-1 break-words">{c.body}</p>
                 </div>
@@ -242,7 +241,7 @@ export const TrackPageView: React.FC<TrackPageViewProps> = ({
         </div>
 
         <div>
-          <h2 className="text-sm font-bold text-white mb-3">Related Tracks</h2>
+          <h2 className="text-sm font-bold text-white mb-3">{t('relatedTracks')}</h2>
           <div className="space-y-1">
             {relatedTracks.map((relTrack) => (
               <TrackRow

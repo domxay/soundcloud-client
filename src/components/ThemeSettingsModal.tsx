@@ -245,8 +245,8 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
           <div className="flex items-center gap-3">
             <Palette className="text-sc-accent" size={24} />
             <div>
-              <h2 className="text-base font-bold text-white">Appearance & Network Settings</h2>
-              <p className="text-xs text-sc-text-secondary">Custom themes, ambient backgrounds, and network configuration</p>
+              <h2 className="text-base font-bold text-white">{t('appearanceAndNetwork')}</h2>
+              <p className="text-xs text-sc-text-secondary">{t('appearanceSubtitle')}</p>
             </div>
           </div>
 
@@ -276,7 +276,7 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
             }`}
           >
             <Palette size={15} />
-            Color Themes ({THEME_PRESETS.length})
+            {t('themes')}
           </button>
           <button
             onClick={() => setActiveTab('background')}
@@ -287,7 +287,7 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
             }`}
           >
             <ImageIcon size={15} />
-            Custom Background (GIF / Video)
+            {t('customBackground')}
           </button>
           <button
             onClick={() => setActiveTab('network')}
@@ -298,7 +298,7 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
             }`}
           >
             <Globe size={15} />
-            Network & Proxy Routing
+            {t('proxyAndNetwork')}
           </button>
         </div>
 
@@ -400,15 +400,15 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
             <div className="space-y-6">
               <div className="flex items-center justify-between pb-3 border-b border-sc-border">
                 <div>
-                  <h4 className="text-sm font-bold text-white">Background Media</h4>
-                  <p className="text-xs text-sc-text-secondary mt-0.5">Select a local media file (GIF, MP4, photo) or choose a preset</p>
+                  <h4 className="text-sm font-bold text-white">{t('backgroundMedia')}</h4>
+                  <p className="text-xs text-sc-text-secondary mt-0.5">{t('backgroundMediaDesc')}</p>
                 </div>
                 {bgConfig.type !== 'none' && (
                   <button
                     onClick={handleRemoveBackground}
                     className="text-xs text-red-400 hover:text-red-300 font-semibold"
                   >
-                    Reset to Default
+                    {t('resetToDefault')}
                   </button>
                 )}
               </div>
@@ -627,10 +627,10 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                   <div>
                     <label className="block text-xs font-semibold text-white mb-2 flex items-center gap-1.5">
                       <Upload size={14} className="text-sc-accent" />
-                      Choose File from PC (GIF, Video, Image)
+                      {t('chooseFileFromPc')}
                     </label>
                     <p className="text-[11px] text-sc-text-secondary mb-3">
-                      Select any animated GIF, MP4/WebM video, or high-res image from your computer.
+                      {t('backgroundMediaDesc')}
                     </p>
                   </div>
                   {window.electronAPI?.selectBackgroundFile ? (
@@ -639,12 +639,12 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                       className="w-full rounded-sc bg-sc-accent py-2.5 text-xs font-bold text-white hover:bg-sc-accent-hover transition-colors flex items-center justify-center gap-2 shadow-md shadow-sc-accent/20"
                     >
                       <Upload size={14} />
-                      Browse Files on PC
+                      {t('browseFilesPc')}
                     </button>
                   ) : (
                     <label className="flex flex-col items-center justify-center h-20 border border-dashed border-sc-border rounded-sc cursor-pointer hover:border-sc-accent hover:bg-[#1c1c1c] transition-colors">
                       <ImageIcon size={20} className="text-sc-text-secondary mb-1" />
-                      <span className="text-xs text-sc-text-secondary">Click to choose file</span>
+                      <span className="text-xs text-sc-text-secondary">{t('chooseFileFromPc')}</span>
                       <input
                         type="file"
                         accept="image/*,video/mp4,video/webm,.gif"
@@ -659,7 +659,7 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                   <div>
                     <label className="block text-xs font-semibold text-white mb-2 flex items-center gap-1.5">
                       <Video size={14} className="text-sc-accent" />
-                      Direct Link / URL (GIF / MP4 / Image)
+                      {t('directLinkUrl')}
                     </label>
                     <input
                       type="text"
@@ -673,7 +673,7 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                     onClick={handleUrlApply}
                     className="w-full mt-3 rounded-sc border border-sc-border bg-sc-surface py-2 text-xs font-bold text-white hover:bg-sc-hover hover:border-sc-accent transition-colors"
                   >
-                    Apply URL
+                    {t('applyUrl')}
                   </button>
                 </div>
               </div>
@@ -681,12 +681,12 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
               <div className="rounded-sc border border-sc-border bg-[#141414] p-4 space-y-4">
                 <div className="flex items-center gap-2 text-xs font-semibold text-white mb-1">
                   <Sliders size={14} className="text-sc-accent" />
-                  Background Visibility & Readability Controls
+                  {t('backgroundDimming')} & {t('backgroundBlur')}
                 </div>
 
                 <div>
                   <div className="flex justify-between text-xs text-sc-text-secondary mb-1">
-                    <span>Background Dimming / Dark Overlay</span>
+                    <span>{t('backgroundDimming')}</span>
                     <span>{bgConfig.opacity}%</span>
                   </div>
                   <input
@@ -701,7 +701,7 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
 
                 <div>
                   <div className="flex justify-between text-xs text-sc-text-secondary mb-1">
-                    <span>Background Blur</span>
+                    <span>{t('backgroundBlur')}</span>
                     <span>{bgConfig.blur}px</span>
                   </div>
                   <input
@@ -721,10 +721,10 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                 <div>
                   <h4 className="text-sm font-bold text-white flex items-center gap-2">
                     <Shield className="text-sc-accent" size={16} />
-                    Обход блокировок SoundCloud (Режим для РФ без системного VPN)
+                    {t('bypassTitle')}
                   </h4>
                   <p className="text-xs text-sc-text-secondary mt-0.5">
-                    Слушайте музыку и скачивайте треки на полной скорости без включения общего VPN на компьютере.
+                    {t('bypassSubtitle')}
                   </p>
                 </div>
 
@@ -732,10 +732,10 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                   onClick={handleDetectProxy}
                   disabled={detecting}
                   className="flex items-center gap-1.5 rounded-sc border border-sc-border bg-sc-surface px-3 py-1.5 text-xs font-semibold text-white hover:border-sc-accent transition-colors disabled:opacity-50"
-                  title="Сканировать запущенные локальные клиенты"
+                  title="Scan for local running proxy clients"
                 >
                   <RefreshCw size={13} className={detecting ? 'animate-spin' : ''} />
-                  <span>{detecting ? 'Поиск...' : 'Авто-поиск'}</span>
+                  <span>{detecting ? t('searchingProxy') : t('autoDetect')}</span>
                 </button>
               </div>
 
@@ -746,10 +746,10 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-white">
-                          Обнаружен активный клиент: {detectedProxy.name}
+                          {t('clientDetected')}: {detectedProxy.name}
                         </span>
                         <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-extrabold px-1.5 py-0.5 rounded">
-                          Готов к работе
+                          {t('connected')}
                         </span>
                       </div>
                       <span className="text-[11px] text-sc-text-secondary font-mono block mt-0.5">
@@ -765,7 +765,7 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                     }}
                     className="rounded-sc bg-emerald-500 hover:bg-emerald-400 px-4 py-2 text-xs font-bold text-black transition-colors shrink-0 shadow-md"
                   >
-                    Подключить в 1 клик
+                    {t('connectToProxy')}
                   </button>
                 </div>
               )}

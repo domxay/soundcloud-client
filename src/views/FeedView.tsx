@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Button } from '@/components/ui/Button';
+import { useI18n } from '@/services/i18n';
 
 interface FeedViewProps {
   onPlayTrack: (track: Track, list?: Track[]) => void;
@@ -24,6 +25,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
   onLikeTrack,
   onOpenLogin,
 }) => {
+  const { t } = useI18n();
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,19 +61,17 @@ export const FeedView: React.FC<FeedViewProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <Radio size={22} className="text-[#ff5500]" />
-            <h1 className="text-2xl font-bold text-white tracking-tight">Stream & Feed</h1>
+            <h1 className="text-2xl font-bold text-white tracking-tight">{t('feedTitle')}</h1>
           </div>
           <p className="text-xs text-[#999999] mt-1">
-            {isAuth
-              ? 'Hear the latest tracks from creators you follow and your recommendations.'
-              : 'Trending live stream from SoundCloud creators.'}
+            {isAuth ? t('feedAuthSubtitle') : t('feedGuestSubtitle')}
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           {!isAuth && (
             <Button size="sm" variant="secondary" onClick={onOpenLogin}>
-              Sign in for personalized feed
+              {t('signInForFeed')}
             </Button>
           )}
           <Button
@@ -80,7 +80,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
             icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
             onClick={loadFeed}
           >
-            Refresh
+            {t('refreshFeed')}
           </Button>
         </div>
       </div>
@@ -103,9 +103,9 @@ export const FeedView: React.FC<FeedViewProps> = ({
       ) : tracks.length === 0 ? (
         <EmptyState
           icon={<Flame size={28} />}
-          title="Your feed is currently quiet"
-          description="Follow creators or check trending music to discover new tracks."
-          actionLabel="Refresh feed"
+          title={t('feedEmptyTitle')}
+          description={t('feedEmptyDesc')}
+          actionLabel={t('refreshFeed')}
           onAction={loadFeed}
         />
       ) : (

@@ -27,6 +27,7 @@ import {
 import { Track, Comment } from '@/types';
 import { formatTime } from '@/services/utils';
 import { audioService, EqualizerPreset } from '@/services/audio';
+import { useI18n } from '@/services/i18n';
 import Waveform from './Waveform';
 
 interface MiniPlayerProps {
@@ -92,6 +93,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   onTrackTitleClick,
   onArtistClick,
 }) => {
+  const { t } = useI18n();
   const [eqOpen, setEqOpen] = useState(false);
   const [speedOpen, setSpeedOpen] = useState(false);
   const [timerOpen, setTimerOpen] = useState(false);
@@ -122,19 +124,19 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
 
   const speeds = [0.75, 1.0, 1.25, 1.5, 2.0];
   const timers = [
-    { label: 'Off', val: null },
-    { label: '15 min', val: 15 },
-    { label: '30 min', val: 30 },
-    { label: '45 min', val: 45 },
-    { label: '60 min', val: 60 },
+    { label: t('timerOff'), val: null },
+    { label: `15 ${t('minShort')}`, val: 15 },
+    { label: `30 ${t('minShort')}`, val: 30 },
+    { label: `45 ${t('minShort')}`, val: 45 },
+    { label: `60 ${t('minShort')}`, val: 60 },
   ];
   const eqPresets: { id: EqualizerPreset; label: string; icon: LucideIcon }[] = [
-    { id: 'flat', label: 'Flat (Standard)', icon: SlidersHorizontal },
-    { id: 'bass_boost', label: 'Bass Boost', icon: Volume2 },
-    { id: 'phonk', label: 'Phonk & Sub-Bass', icon: Zap },
-    { id: 'treble_boost', label: 'Treble Boost', icon: Sparkles },
-    { id: 'vocal', label: 'Vocal Clarity', icon: Mic },
-    { id: 'rock', label: 'Rock & Dynamic', icon: Radio },
+    { id: 'flat', label: t('equalizerFlat'), icon: SlidersHorizontal },
+    { id: 'bass_boost', label: t('equalizerBass'), icon: Volume2 },
+    { id: 'phonk', label: t('equalizerPhonk'), icon: Zap },
+    { id: 'treble_boost', label: t('equalizerTreble'), icon: Sparkles },
+    { id: 'vocal', label: t('equalizerVocal'), icon: Mic },
+    { id: 'rock', label: t('equalizerRock'), icon: Radio },
   ];
 
   return (
@@ -172,14 +174,14 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             className={`p-1.5 rounded-full transition-colors hover:bg-[#222222] ${
               liked ? 'text-[#ff5500]' : 'text-[#888888] hover:text-white'
             }`}
-            title={liked ? 'Unlike' : 'Like'}
+            title={liked ? t('unlike') : t('like')}
           >
             <Heart size={16} fill={liked ? '#ff5500' : 'none'} />
           </button>
           <button
             onClick={onOpenComments}
             className="p-1.5 rounded-full text-[#888888] hover:text-white hover:bg-[#222222] transition-colors"
-            title="Comments"
+            title={t('comments')}
           >
             <MessageSquare size={16} />
           </button>
@@ -187,7 +189,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             <button
               onClick={onOpenLyrics}
               className="p-1.5 rounded-full text-[#888888] hover:text-white hover:bg-[#222222] transition-colors"
-              title="Lyrics"
+              title={t('lyrics')}
             >
               <Mic2 size={16} />
             </button>
@@ -196,7 +198,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             onClick={onDownload}
             disabled={downloading}
             className="p-1.5 rounded-full text-[#888888] hover:text-white hover:bg-[#222222] transition-colors disabled:opacity-50"
-            title="Download track"
+            title={t('download')}
           >
             {downloading ? (
               <Loader2 size={16} className="animate-spin text-[#ff5500]" />
@@ -215,21 +217,21 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             className={`transition-colors p-1 rounded-full ${
               shuffle ? 'text-[#ff5500]' : 'text-[#888888] hover:text-white'
             }`}
-            title="Shuffle"
+            title={t('shuffle')}
           >
             <Shuffle size={15} />
           </button>
           <button
             onClick={onPrev}
             className="text-[#888888] hover:text-white transition-colors p-1"
-            title="Previous"
+            title={t('previous')}
           >
             <SkipBack size={17} fill="currentColor" />
           </button>
           <button
             onClick={onPlayPause}
             className="flex h-9 w-9 items-center justify-center rounded-full bg-[#ff5500] text-white hover:bg-[#ff6600] active:bg-[#e64d00] transition-colors shadow-md shadow-[#ff5500]/20"
-            title={isPlaying ? 'Pause' : 'Play'}
+            title={isPlaying ? t('pause') : t('play')}
           >
             {isPlaying ? (
               <Pause size={17} fill="white" />
@@ -240,7 +242,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
           <button
             onClick={onNext}
             className="text-[#888888] hover:text-white transition-colors p-1"
-            title="Next"
+            title={t('next')}
           >
             <SkipForward size={17} fill="currentColor" />
           </button>
@@ -251,7 +253,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                 ? 'text-[#ff5500]'
                 : 'text-[#888888] hover:text-white'
             }`}
-            title={`Repeat: ${repeatMode}`}
+            title={repeatMode === 'one' ? t('repeatOne') : repeatMode === 'all' ? t('repeatAll') : t('repeatOff')}
           >
             {repeatMode === 'one' ? <Repeat1 size={15} /> : <Repeat size={15} />}
           </button>
@@ -295,14 +297,14 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                 ? 'text-[#ff5500] bg-[#ff5500]/10'
                 : 'text-[#888888] hover:text-white hover:bg-[#222222]'
             }`}
-            title="Equalizer & Bass Boost"
+            title={t('equalizer')}
           >
             <SlidersHorizontal size={16} />
           </button>
 
           {eqOpen && (
             <div className="absolute bottom-11 right-0 w-48 rounded-lg border border-[#2e2e2e] bg-[#1a1a1a] p-2 shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
-              <p className="text-[11px] font-bold text-white mb-1.5 px-2">Equalizer Presets</p>
+              <p className="text-[11px] font-bold text-white mb-1.5 px-2">{t('equalizerPresets')}</p>
               <div className="space-y-1">
                 {eqPresets.map((p) => {
                   const Icon = p.icon;
@@ -341,7 +343,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                 ? 'text-[#ff5500] bg-[#ff5500]/10'
                 : 'text-[#888888] hover:text-white hover:bg-[#222222]'
             }`}
-            title={`Playback Speed: ${speed}x`}
+            title={`${t('speed')}: ${speed}x`}
           >
             <span className="flex items-center gap-0.5 font-mono text-[11px]">
               <Gauge size={13} />
@@ -351,7 +353,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
 
           {speedOpen && (
             <div className="absolute bottom-11 right-0 w-28 rounded-lg border border-[#2e2e2e] bg-[#1a1a1a] p-1.5 shadow-2xl z-50">
-              <p className="text-[10px] font-bold text-white mb-1 px-1.5 uppercase">Speed</p>
+              <p className="text-[10px] font-bold text-white mb-1 px-1.5 uppercase">{t('speed')}</p>
               <div className="space-y-0.5">
                 {speeds.map((s) => (
                   <button
@@ -386,8 +388,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             }`}
             title={
               sleepTimerSeconds
-                ? `Sleep Timer: ${Math.floor(sleepTimerSeconds / 60)}m left`
-                : 'Sleep Timer'
+                ? `${t('sleepTimer')}: ${Math.floor(sleepTimerSeconds / 60)}${t('minShort')}`
+                : t('sleepTimer')
             }
           >
             <Clock size={16} />
@@ -395,15 +397,15 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
 
           {timerOpen && (
             <div className="absolute bottom-11 right-0 w-36 rounded-lg border border-[#2e2e2e] bg-[#1a1a1a] p-1.5 shadow-2xl z-50">
-              <p className="text-[10px] font-bold text-white mb-1 px-1.5 uppercase">Sleep Timer</p>
+              <p className="text-[10px] font-bold text-white mb-1 px-1.5 uppercase">{t('sleepTimer')}</p>
               <div className="space-y-0.5">
-                {timers.map((t, idx) => (
+                {timers.map((timerItem, idx) => (
                   <button
                     key={idx}
-                    onClick={() => handleSelectTimer(t.val)}
+                    onClick={() => handleSelectTimer(timerItem.val)}
                     className="w-full text-left px-2 py-1.5 rounded text-xs text-[#ccc] hover:bg-[#282828] hover:text-white transition-colors"
                   >
-                    {t.label}
+                    {timerItem.label}
                   </button>
                 ))}
               </div>
@@ -416,7 +418,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
           <button
             onClick={handleToggleMute}
             className="text-[#888888] hover:text-white transition-colors"
-            title={volume === 0 ? 'Unmute' : 'Mute'}
+            title={volume === 0 ? t('unmute') : t('mute')}
           >
             {volume === 0 ? <VolumeX size={17} /> : <Volume2 size={17} />}
           </button>
@@ -442,7 +444,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                 ? 'text-[#ff5500] bg-[#ff5500]/10'
                 : 'text-[#888888] hover:text-white hover:bg-[#222222]'
             }`}
-            title="Next up queue"
+            title={t('queue')}
           >
             <ListMusic size={18} />
             {queueCount > 0 && (
