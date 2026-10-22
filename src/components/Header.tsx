@@ -15,8 +15,10 @@ import {
   ShieldCheck,
   ShieldAlert,
   RefreshCw,
+  Globe,
 } from 'lucide-react';
 import { authService } from '@/services/auth';
+import { useI18n } from '@/services/i18n';
 
 interface HeaderProps {
   onOpenLogin: () => void;
@@ -27,6 +29,7 @@ export default function Header({
   onOpenLogin,
   onOpenThemeSettings,
 }: HeaderProps) {
+  const { lang, t, toggleLanguage } = useI18n();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const [proxyInfo, setProxyInfo] = useState<{ active: boolean; name: string } | null>(null);
@@ -117,9 +120,9 @@ export default function Header({
   const isElectron = Boolean((window as any).electronAPI);
 
   const navLinks = [
-    { to: '/', label: 'Home' },
-    { to: '/feed', label: 'Feed' },
-    { to: '/library', label: 'Library' },
+    { to: '/', label: t('home') },
+    { to: '/feed', label: t('feed') },
+    { to: '/library', label: t('library') },
   ];
 
   return (
@@ -173,7 +176,7 @@ export default function Header({
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Search tracks, artists... (Press Enter)"
+          placeholder={t('searchPlaceholder')}
           className="w-full rounded border border-[#2a2a2a] bg-[#1a1a1a] py-1.5 pl-8 pr-12 text-xs text-white placeholder:text-[#666666] focus:border-[#ff5500] focus:outline-none transition-colors"
         />
         <kbd className="absolute right-2 top-1/2 -translate-y-1/2 rounded border border-[#333333] bg-[#242424] px-1 py-0.5 text-[9px] font-medium text-[#777777]">
@@ -185,6 +188,16 @@ export default function Header({
         className="flex items-center gap-2 ml-auto shrink-0"
         style={{ WebkitAppRegion: 'no-drag' } as any}
       >
+        {/* Language Switcher Button (RU / EN) */}
+        <button
+          onClick={toggleLanguage}
+          className="flex items-center gap-1.5 rounded border border-[#282828] bg-[#1a1a1a] px-2 py-1 text-xs font-bold text-zinc-300 hover:text-white hover:border-[#ff5500] transition-all shadow-sm"
+          title={lang === 'ru' ? 'Сменить язык на English' : 'Switch language to Русский'}
+        >
+          <Globe size={13} className="text-[#ff5500]" />
+          <span className="text-[11px] font-bold uppercase">{lang}</span>
+        </button>
+
         {proxyInfo && (
           <button
             onClick={() => navigate('/settings')}
@@ -207,10 +220,10 @@ export default function Header({
         <button
           onClick={handleUploadClick}
           className="hidden xl:flex items-center gap-1 text-xs font-medium text-[#999999] hover:text-white px-2 py-1 rounded transition-colors"
-          title="Upload to SoundCloud"
+          title={t('upload')}
         >
           <Upload size={14} />
-          <span>Upload</span>
+          <span>{t('upload')}</span>
         </button>
 
         <button
@@ -222,10 +235,10 @@ export default function Header({
             }
           }}
           className="flex items-center gap-1.5 rounded border border-[#282828] bg-[#1a1a1a] px-2.5 py-1 text-xs font-semibold text-white hover:border-[#ff5500] hover:text-[#ff5500] transition-all shadow-sm"
-          title="Application Settings & Themes"
+          title={t('themeAndSettings')}
         >
           <Sliders size={13} className="text-[#ff5500]" />
-          <span className="hidden sm:inline">Settings</span>
+          <span className="hidden sm:inline">{t('settings')}</span>
         </button>
 
         <button

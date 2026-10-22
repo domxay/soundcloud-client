@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { themeService, THEME_PRESETS, BACKGROUND_PRESETS, CustomBackground } from '@/services/theme';
 import { ALL_WALLPAPERS, WallpaperItem } from '@/data/wallpapers';
-import { X, Palette, Image as ImageIcon, Video, Check, Upload, Sliders, Sparkles, Shield, Globe, CheckCircle2, RefreshCw, Search, Film } from 'lucide-react';
+import { X, Palette, Image as ImageIcon, Video, Check, Upload, Sliders, Sparkles, Shield, Globe, CheckCircle2, RefreshCw, Search, Film, Languages } from 'lucide-react';
+import { useI18n } from '@/services/i18n';
 
 interface ThemeSettingsModalProps {
   isOpen: boolean;
@@ -9,7 +10,8 @@ interface ThemeSettingsModalProps {
 }
 
 export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<'themes' | 'background' | 'network'>('themes');
+  const { lang, t, setLanguage } = useI18n();
+  const [activeTab, setActiveTab] = useState<'language' | 'themes' | 'background' | 'network'>('themes');
   const [currentTheme, setCurrentTheme] = useState(themeService.getTheme());
   const [bgConfig, setBgConfig] = useState<CustomBackground>(themeService.getBackground());
   const [customUrl, setCustomUrl] = useState(bgConfig.url || '');
@@ -255,6 +257,17 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
 
         <div className="flex border-b border-sc-border bg-[#111] px-6 gap-2">
           <button
+            onClick={() => setActiveTab('language')}
+            className={`py-3 px-4 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
+              activeTab === 'language'
+                ? 'border-sc-accent text-sc-accent'
+                : 'border-transparent text-sc-text-secondary hover:text-white'
+            }`}
+          >
+            <Languages size={15} />
+            {t('interfaceLanguage')} ({lang.toUpperCase()})
+          </button>
+          <button
             onClick={() => setActiveTab('themes')}
             className={`py-3 px-4 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
               activeTab === 'themes'
@@ -290,7 +303,62 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          {activeTab === 'themes' ? (
+          {activeTab === 'language' ? (
+            <div className="flex flex-col gap-4 max-w-xl mx-auto py-4">
+              <div>
+                <h3 className="text-sm font-bold text-white mb-1">{t('chooseLanguage')}</h3>
+                <p className="text-xs text-sc-text-secondary">
+                  {lang === 'ru'
+                    ? 'Мгновенное переключение языка интерфейса приложения и оверлея'
+                    : 'Instant switching of application and desktop overlay language'}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Russian */}
+                <div
+                  onClick={() => setLanguage('ru')}
+                  className={`cursor-pointer rounded-sc border p-4 transition-all flex flex-col justify-between ${
+                    lang === 'ru'
+                      ? 'border-sc-accent bg-sc-accent/10 shadow-lg shadow-sc-accent/20'
+                      : 'border-sc-border bg-sc-surface-elevated hover:border-sc-accent/60'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-xl">🇷🇺</span>
+                      <span className="text-sm font-bold text-white">Русский</span>
+                    </div>
+                    {lang === 'ru' && <CheckCircle2 size={18} className="text-sc-accent" />}
+                  </div>
+                  <p className="text-xs text-sc-text-secondary">
+                    Полный русскоязычный интерфейс, локализация плеера и десктопного оверлея
+                  </p>
+                </div>
+
+                {/* English */}
+                <div
+                  onClick={() => setLanguage('en')}
+                  className={`cursor-pointer rounded-sc border p-4 transition-all flex flex-col justify-between ${
+                    lang === 'en'
+                      ? 'border-sc-accent bg-sc-accent/10 shadow-lg shadow-sc-accent/20'
+                      : 'border-sc-border bg-sc-surface-elevated hover:border-sc-accent/60'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-xl">🇺🇸</span>
+                      <span className="text-sm font-bold text-white">English</span>
+                    </div>
+                    {lang === 'en' && <CheckCircle2 size={18} className="text-sc-accent" />}
+                  </div>
+                  <p className="text-xs text-sc-text-secondary">
+                    Authentic English interface, localized playback controls and floating island HUD
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : activeTab === 'themes' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {THEME_PRESETS.map((t) => {
                 const isSelected = currentTheme.id === t.id;
