@@ -10,11 +10,8 @@ import {
   Music2,
   Sliders,
   GripVertical,
-  MoveHorizontal,
 } from 'lucide-react';
 import { OverlayState } from '@/types';
-
-const WIDTH_PRESETS = [440, 580, 720, 860];
 
 export default function DesktopOverlay() {
   const [state, setState] = useState<OverlayState>({
@@ -42,14 +39,15 @@ export default function DesktopOverlay() {
   });
 
   const isDraggingRef = useRef(false);
+  const isResizingRef = useRef(false);
   const startPosRef = useRef({ x: 0, y: 0 });
 
-  // Native smooth dragging via Electron IPC across the entire surface
+  // Native smooth dragging via Electron IPC across the main surface
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || isResizingRef.current) return;
     const target = e.target as HTMLElement;
-    // Never drag if user clicks a button, input, or interactive control
-    if (target.closest('button, input, select, textarea, a, [data-interactive="true"]')) {
+    // Never drag if user clicks a button, input, or edge resize handle
+    if (target.closest('button, input, select, textarea, a, [data-interactive="true"], [data-resize-handle="true"]')) {
       return;
     }
 
@@ -71,6 +69,53 @@ export default function DesktopOverlay() {
 
     const handleMouseUp = () => {
       isDraggingRef.current = false;
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  // Edge interactive resize handlers (Left & Right ends)
+  const handleEdgeResizeStart = (e: React.MouseEvent, direction: 'left' | 'right') => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (e.button !== 0) return;
+
+    isResizingRef.current = true;
+    const startX = e.screenX;
+    const startW = customWidth;
+    const targetHeight = mode === 'compact' ? 54 : 110;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isResizingRef.current) return;
+      const delta = moveEvent.screenX - startX;
+
+      if (direction === 'right') {
+        const nextW = Math.max(380, Math.min(1000, Math.round(startW + delta)));
+        setCustomWidth(nextW);
+        localStorage.setItem('sc_overlay_width', nextW.toString());
+        if (window.electronAPI?.resizeOverlay) {
+          window.electronAPI.resizeOverlay(nextW, targetHeight);
+        }
+      } else {
+        // Left edge resize: adjusts width and shifts window position symmetrically
+        const nextW = Math.max(380, Math.min(1000, Math.round(startW - delta)));
+        const deltaShift = startW - nextW;
+        setCustomWidth(nextW);
+        localStorage.setItem('sc_overlay_width', nextW.toString());
+        if (window.electronAPI?.moveOverlay && deltaShift !== 0) {
+          window.electronAPI.moveOverlay(-deltaShift, 0);
+        }
+        if (window.electronAPI?.resizeOverlay) {
+          window.electronAPI.resizeOverlay(nextW, targetHeight);
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      isResizingRef.current = false;
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
@@ -157,33 +202,8 @@ export default function DesktopOverlay() {
     setShapeStyle((prev) => (prev === 'pill' ? 'squircle' : 'pill'));
   };
 
-  // Cycle width presets or fine-tune with mouse wheel
-  const cycleWidth = () => {
-    setCustomWidth((prev) => {
-      const currentIndex = WIDTH_PRESETS.findIndex((w) => Math.abs(w - prev) < 40);
-      const nextIndex = (currentIndex + 1) % WIDTH_PRESETS.length;
-      return WIDTH_PRESETS[nextIndex];
-    });
-  };
-
-  const handleWheelResize = (e: React.WheelEvent) => {
-    e.preventDefault();
-    setCustomWidth((prev) => {
-      const step = e.deltaY < 0 ? 30 : -30; // scroll up expands, scroll down narrows
-      const next = Math.max(380, Math.min(920, prev + step));
-      return next;
-    });
-  };
-
   const accent = state.themeAccent || '#ff5500';
   const track = state.track;
-
-  const getWidthLabel = () => {
-    if (customWidth <= 460) return 'Узкий';
-    if (customWidth <= 620) return 'Стандарт';
-    if (customWidth <= 760) return 'Широкий';
-    return 'Макс';
-  };
 
   return (
     <div
@@ -199,6 +219,26 @@ export default function DesktopOverlay() {
           boxShadow: `0 8px 32px rgba(0, 0, 0, 0.75), 0 0 16px ${accent}25`,
         }}
       >
+        {/* Left Edge Resize Handle (↔ Hover to resize) */}
+        <div
+          data-resize-handle="true"
+          onMouseDown={(e) => handleEdgeResizeStart(e, 'left')}
+          className="absolute left-0 top-0 bottom-0 w-3 z-50 cursor-ew-resize flex items-center justify-center group"
+          title="Потяните край для изменения ширины оверлея"
+        >
+          <div className="w-0.5 h-4 rounded-full bg-white/10 group-hover:bg-white/60 transition-colors" />
+        </div>
+
+        {/* Right Edge Resize Handle (↔ Hover to resize) */}
+        <div
+          data-resize-handle="true"
+          onMouseDown={(e) => handleEdgeResizeStart(e, 'right')}
+          className="absolute right-0 top-0 bottom-0 w-3 z-50 cursor-ew-resize flex items-center justify-center group"
+          title="Потяните край для изменения ширины оверлея"
+        >
+          <div className="w-0.5 h-4 rounded-full bg-white/10 group-hover:bg-white/60 transition-colors" />
+        </div>
+
         {/* Upper Progress Track Bar */}
         <div
           onMouseDown={handleMouseDown}
@@ -217,16 +257,15 @@ export default function DesktopOverlay() {
         {/* Main Controls Row */}
         <div
           onMouseDown={handleMouseDown}
-          className={`flex items-center px-2 py-1.5 gap-2.5 h-[52px] cursor-grab active:cursor-grabbing ${
-            shapeStyle === 'pill' ? 'px-3.5' : 'px-3'
+          className={`flex items-center px-3 py-1.5 gap-2.5 h-[52px] cursor-grab active:cursor-grabbing ${
+            shapeStyle === 'pill' ? 'px-4' : 'px-3.5'
           }`}
         >
-          {/* Tactical Grip Handle & Scroll Resize Zone */}
+          {/* Tactical Grip Handle */}
           <div
             onMouseDown={handleMouseDown}
-            onWheel={handleWheelResize}
             className="cursor-grab active:cursor-grabbing text-zinc-500 hover:text-white px-0.5 py-1.5 flex items-center justify-center transition-colors shrink-0 select-none"
-            title="Зажмите для перемещения • Прокрутка колесом мыши: сузить / расширить"
+            title="Зажмите для перемещения в любое место"
           >
             <GripVertical size={14} />
           </div>
@@ -271,16 +310,16 @@ export default function DesktopOverlay() {
             title="Зажмите для перемещения • Двойной клик: развернуть плеер"
           >
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-white truncate max-w-[260px] leading-snug">
+              <span className="text-xs font-bold text-white truncate leading-snug">
                 {track?.title || 'Воспроизведение остановлено'}
               </span>
             </div>
             <div className="flex items-center gap-2 text-[11px] text-zinc-400 truncate leading-tight">
-              <span className="truncate max-w-[160px]">{track?.artist || 'SoundCloud Desktop'}</span>
+              <span className="truncate">{track?.artist || 'SoundCloud Desktop'}</span>
               {mode === 'compact' && state.activeLyric && (
                 <>
                   <span className="text-zinc-600">•</span>
-                  <span className="text-zinc-300 italic truncate max-w-[180px] font-medium" style={{ color: `${accent}dd` }}>
+                  <span className="text-zinc-300 italic truncate font-medium" style={{ color: `${accent}dd` }}>
                     {state.activeLyric}
                   </span>
                 </>
@@ -323,22 +362,11 @@ export default function DesktopOverlay() {
             </button>
           </div>
 
-          {/* Right Utility Buttons: Resize Width, Lyrics Toggle, Shape Switcher, Restore, Close */}
+          {/* Right Utility Buttons: Lyrics Toggle, Shape Switcher, Restore, Close */}
           <div
             data-interactive="true"
             className="flex items-center gap-1 shrink-0 pl-1 border-l border-white/10"
           >
-            {/* Overlay Width Control (Narrow / Standard / Wide / Scroll) */}
-            <button
-              onClick={cycleWidth}
-              onWheel={handleWheelResize}
-              className="h-7 px-1.5 flex items-center gap-1 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors text-[10px] font-medium"
-              title={`Размер оверлея: ${customWidth}px (${getWidthLabel()})\n• Клик: переключить (440px / 580px / 720px / 860px)\n• Колесо мыши: плавно сузить или расширить`}
-            >
-              <MoveHorizontal size={13} />
-              <span className="text-[10px] text-zinc-400 group-hover:text-white">{customWidth}</span>
-            </button>
-
             <button
               onClick={toggleMode}
               className={`w-7 h-7 flex items-center justify-center rounded-full transition-colors ${
@@ -381,9 +409,8 @@ export default function DesktopOverlay() {
         {mode === 'expanded' && (
           <div
             onMouseDown={handleMouseDown}
-            onWheel={handleWheelResize}
             className="px-5 py-2.5 bg-black/60 border-t border-white/10 flex flex-col justify-center min-h-[52px] cursor-grab active:cursor-grabbing"
-            title="Зажмите для перемещения • Прокрутка: сузить/расширить"
+            title="Зажмите для перемещения в любое место"
           >
             {state.activeLyric ? (
               <div

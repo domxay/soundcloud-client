@@ -540,21 +540,13 @@ ipcMain.on('sc:overlay-move', (event, { deltaX, deltaY }) => {
   }
 });
 
-ipcMain.handle('sc:resize-overlay', (event, { width, height }) => {
+ipcMain.handle('sc:resize-overlay', (event, { width, height, newX }) => {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     try {
       const [currentX, currentY] = overlayWindow.getPosition();
-      const [currentWidth] = overlayWindow.getSize();
-      const primaryDisplay = screen.getPrimaryDisplay();
-      const { width: screenWidth } = primaryDisplay.workAreaSize;
-      
-      const deltaW = Math.round(width) - currentWidth;
-      let nextX = Math.round(currentX - deltaW / 2);
-      if (nextX < 0) nextX = 0;
-      if (nextX + Math.round(width) > screenWidth) nextX = Math.max(0, screenWidth - Math.round(width));
-
+      const targetX = typeof newX === 'number' ? Math.round(newX) : currentX;
       overlayWindow.setSize(Math.round(width), Math.round(height));
-      overlayWindow.setPosition(nextX, currentY);
+      overlayWindow.setPosition(targetX, currentY);
     } catch {}
   }
 });
