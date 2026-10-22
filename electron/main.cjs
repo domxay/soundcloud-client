@@ -457,25 +457,35 @@ function createWindow() {
     mainWindow.focus();
   });
 
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+
   mainWindow.on('minimize', () => {
-    const win = createOverlayWindow();
-    win.showInactive();
-    win.setAlwaysOnTop(true, 'screen-saver');
-    if (cachedOverlayState) {
-      win.webContents.send('sc:overlay-state', cachedOverlayState);
-    }
+    try {
+      const win = createOverlayWindow();
+      win.showInactive();
+      win.setAlwaysOnTop(true, 'screen-saver');
+      if (cachedOverlayState && !win.isDestroyed()) {
+        win.webContents.send('sc:overlay-state', cachedOverlayState);
+      }
+    } catch {}
   });
 
   mainWindow.on('restore', () => {
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.hide();
-    }
+    try {
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.hide();
+      }
+    } catch {}
   });
 
   mainWindow.on('focus', () => {
-    if (mainWindow && mainWindow.isVisible() && !mainWindow.isMinimized() && overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.hide();
-    }
+    try {
+      if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible() && !mainWindow.isMinimized() && overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.hide();
+      }
+    } catch {}
   });
 
   const distPath = path.join(__dirname, '../dist/index.html');
@@ -510,11 +520,15 @@ ipcMain.on('sc:overlay-sync-state', (event, state) => {
 ipcMain.on('sc:overlay-action', (event, data) => {
   const { action, payload } = data || {};
   if (action === 'expand-app' || action === 'restore') {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.show();
-      mainWindow.focus();
-    }
+    try {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+      } else {
+        createWindow();
+      }
+    } catch {}
     if (overlayWindow && !overlayWindow.isDestroyed()) {
       overlayWindow.hide();
     }
@@ -590,11 +604,15 @@ ipcMain.handle('sc:resize-overlay', (event, payload, legacyHeight, legacyNewX) =
 });
 
 ipcMain.handle('sc:restore-main-window', () => {
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
-  }
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    } else {
+      createWindow();
+    }
+  } catch {}
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.hide();
   }
@@ -617,11 +635,11 @@ ipcMain.handle('sc:toggle-overlay', (event, explicitShow) => {
 });
 
 ipcMain.handle('sc:window-minimize', () => {
-  if (mainWindow) mainWindow.minimize();
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.minimize();
 });
 
 ipcMain.handle('sc:window-maximize', () => {
-  if (mainWindow) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
     if (mainWindow.isMaximized()) {
       mainWindow.unmaximize();
     } else {
@@ -631,7 +649,7 @@ ipcMain.handle('sc:window-maximize', () => {
 });
 
 ipcMain.handle('sc:window-close', () => {
-  if (mainWindow) mainWindow.close();
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close();
 });
 
 ipcMain.handle('sc:select-save-file', async (event, defaultName) => {

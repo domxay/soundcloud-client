@@ -110,13 +110,11 @@ export default function DesktopOverlay() {
     };
 
     const handleMouseUp = (upEvent: MouseEvent) => {
-      const finalRatio = calculateRatio(upEvent.clientX);
+      const finalRatio = Math.max(0, Math.min(0.999, calculateRatio(upEvent.clientX)));
       setIsScrubbing(false);
       setScrubRatio(null);
-      if (trackDuration > 0) {
-        const targetSeconds = finalRatio * trackDuration;
-        handleAction('seek', targetSeconds);
-      }
+      setState((prev) => ({ ...prev, progress: finalRatio }));
+      handleAction('seek', finalRatio);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
@@ -287,14 +285,14 @@ export default function DesktopOverlay() {
       onMouseDown={handleMouseDown}
       className="w-screen h-screen flex items-center justify-center p-3 m-0 select-none bg-transparent overflow-hidden font-sans cursor-grab active:cursor-grabbing"
     >
-      {/* Pristine OLED Floating Card Container */}
+      {/* Pristine OLED Floating Card Container (Seamless, No White Border) */}
       <div
         onMouseDown={handleMouseDown}
-        className={`w-full max-w-full transition-[height] duration-200 flex flex-col justify-between overflow-hidden relative border border-white/12 bg-[#0e0e12] cursor-grab active:cursor-grabbing shadow-[0_12px_32px_rgba(0,0,0,0.85),0_2px_8px_rgba(0,0,0,0.6)] ${
+        className={`w-full max-w-full transition-[height] duration-200 flex flex-col justify-between overflow-hidden relative border-0 bg-[#0c0c0e] cursor-grab active:cursor-grabbing shadow-[0_12px_36px_rgba(0,0,0,0.95),0_2px_8px_rgba(0,0,0,0.8)] ${
           shapeStyle === 'pill' ? 'rounded-full' : 'rounded-2xl'
         }`}
         style={{
-          boxShadow: `0 10px 30px rgba(0, 0, 0, 0.85), 0 0 1px rgba(255, 255, 255, 0.15), 0 0 16px ${accent}20`,
+          boxShadow: `0 12px 36px rgba(0, 0, 0, 0.95), 0 2px 8px rgba(0, 0, 0, 0.8)`,
         }}
       >
         {/* Left Edge Resize Handle (↔ Hover to resize) */}
@@ -304,7 +302,7 @@ export default function DesktopOverlay() {
           className="absolute left-0 top-0 bottom-0 w-3.5 z-50 cursor-ew-resize flex items-center justify-center group"
           title="Потяните край для изменения ширины"
         >
-          <div className="w-0.5 h-4 rounded-full bg-white/10 group-hover:bg-white/70 transition-colors" />
+          <div className="w-0.5 h-4 rounded-full bg-zinc-700/60 group-hover:bg-zinc-400 transition-colors" />
         </div>
 
         {/* Right Edge Resize Handle (↔ Hover to resize) */}
@@ -314,7 +312,7 @@ export default function DesktopOverlay() {
           className="absolute right-0 top-0 bottom-0 w-3.5 z-50 cursor-ew-resize flex items-center justify-center group"
           title="Потяните край для изменения ширины"
         >
-          <div className="w-0.5 h-4 rounded-full bg-white/10 group-hover:bg-white/70 transition-colors" />
+          <div className="w-0.5 h-4 rounded-full bg-zinc-700/60 group-hover:bg-zinc-400 transition-colors" />
         </div>
 
         {/* Interactive Progress Track Bar & Scrubber Slider */}
@@ -326,7 +324,7 @@ export default function DesktopOverlay() {
           title={`Перемотка: ${formatTime(currentSeconds)} / ${formatTime(state.duration || 0)}`}
         >
           {/* Track Line Background */}
-          <div className="w-full h-[3px] group-hover/seek:h-[4.5px] bg-white/15 group-hover/seek:bg-white/25 transition-all relative overflow-visible">
+          <div className="w-full h-[3px] group-hover/seek:h-[4.5px] bg-zinc-800 group-hover/seek:bg-zinc-700 transition-all relative overflow-visible">
             {/* Filled Accent Progress Bar */}
             <div
               className="h-full relative pointer-events-none"
@@ -375,13 +373,13 @@ export default function DesktopOverlay() {
               <img
                 src={track.artwork}
                 alt={track.title}
-                className={`h-8 w-8 object-cover border border-white/20 shadow-md transition-transform group-hover:scale-105 pointer-events-none ${
+                className={`h-8 w-8 object-cover border-0 shadow-md transition-transform group-hover:scale-105 pointer-events-none ${
                   shapeStyle === 'pill' ? 'rounded-full' : 'rounded-lg'
                 }`}
               />
             ) : (
               <div
-                className={`h-8 w-8 bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-400 ${
+                className={`h-8 w-8 bg-zinc-900 border-0 flex items-center justify-center text-zinc-400 ${
                   shapeStyle === 'pill' ? 'rounded-full' : 'rounded-lg'
                 }`}
               >
@@ -459,7 +457,7 @@ export default function DesktopOverlay() {
           {/* Right Utility Buttons: Lyrics Toggle, Shape Switcher, Restore, Close */}
           <div
             data-interactive="true"
-            className="flex items-center gap-1 shrink-0 pl-1 border-l border-white/10"
+            className="flex items-center gap-1 shrink-0 pl-1 border-l border-zinc-800/80"
           >
             <button
               onClick={toggleMode}
@@ -503,7 +501,7 @@ export default function DesktopOverlay() {
         {mode === 'expanded' && (
           <div
             onMouseDown={handleMouseDown}
-            className="px-5 py-2.5 bg-black/40 border-t border-white/10 flex flex-col justify-center min-h-[50px] cursor-grab active:cursor-grabbing"
+            className="px-5 py-2.5 bg-black/40 border-t border-zinc-800/60 flex flex-col justify-center min-h-[50px] cursor-grab active:cursor-grabbing"
             title="Зажмите для перемещения"
           >
             {state.activeLyric ? (

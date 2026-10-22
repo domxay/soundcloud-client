@@ -197,7 +197,13 @@ function AppContent() {
           break;
         case 'seek':
           if (typeof cmd.payload === 'number') {
-            audioService.seek(cmd.payload);
+            let ratio = cmd.payload;
+            if (ratio > 1 && currentTrack?.duration) {
+              ratio = ratio / currentTrack.duration;
+            }
+            const clamped = Math.max(0, Math.min(1, ratio));
+            audioService.seek(clamped);
+            setProgress(clamped);
           }
           break;
       }
