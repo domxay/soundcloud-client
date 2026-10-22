@@ -9,7 +9,7 @@ interface TrackListProps {
   tracks: Track[];
   currentTrackId: number | null;
   isPlaying: boolean;
-  onTrackPlay: (track: Track) => void;
+  onTrackPlay: (track: Track, list?: Track[]) => void;
   onLikeToggle: (id: number) => void;
   downloadingIds: Set<number>;
   onDownload: (id: number) => void;
@@ -63,7 +63,7 @@ export default function TrackList({
                   {showPlay ? <Pause size={14} fill="var(--sc-accent)" /> : index + 1}
                 </span>
                 <button
-                  onClick={() => onTrackPlay(track)}
+                  onClick={() => onTrackPlay(track, tracks)}
                   className="hidden group-hover:flex items-center justify-center text-white"
                 >
                   {showPlay ? (

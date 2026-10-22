@@ -10,7 +10,7 @@ interface ProfileViewProps {
   currentTrackId: number | null;
   isPlaying: boolean;
   downloadingIds: Set<number>;
-  onTrackPlay: (track: Track) => void;
+  onTrackPlay: (track: Track, list?: Track[]) => void;
   onLikeToggle: (id: number) => void;
   onDownload: (id: number) => void;
   onOpenLogin: () => void;

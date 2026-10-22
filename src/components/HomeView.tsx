@@ -23,7 +23,7 @@ interface HomeViewProps {
   currentTrackId: number | null;
   isPlaying: boolean;
   downloadingIds: Set<number>;
-  onTrackPlay: (track: Track) => void;
+  onTrackPlay: (track: Track, list?: Track[]) => void;
   onLikeToggle: (id: number) => void;
   onDownload: (id: number) => void;
   onSelectPlaylist: (playlist: Playlist) => void;
@@ -188,7 +188,7 @@ export default function HomeView({
                   className="w-40 h-40 md:w-48 md:h-48 rounded-sc object-cover border border-sc-border shadow-2xl"
                 />
                 <button
-                  onClick={() => onTrackPlay(heroTrack)}
+                  onClick={() => onTrackPlay(heroTrack, charts.length > 0 ? charts : [heroTrack])}
                   className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-sc"
                 >
                   <div className="h-14 w-14 rounded-full bg-sc-accent flex items-center justify-center shadow-2xl">
@@ -236,7 +236,7 @@ export default function HomeView({
 
                 <div className="flex items-center justify-center md:justify-start gap-3 mt-6">
                   <button
-                    onClick={() => onTrackPlay(heroTrack)}
+                    onClick={() => onTrackPlay(heroTrack, charts.length > 0 ? charts : [heroTrack])}
                     className="flex items-center gap-2 rounded-sc bg-sc-accent px-6 py-2.5 text-xs font-bold text-white hover:bg-sc-accent-hover transition-colors shadow-lg shadow-sc-accent/25"
                   >
                     {currentTrackId === heroTrack.id && isPlaying ? (
@@ -323,7 +323,7 @@ export default function HomeView({
                       loading="lazy"
                     />
                     <button
-                      onClick={() => onTrackPlay(track)}
+                      onClick={() => onTrackPlay(track, charts)}
                       className="absolute inset-0 bg-black/60 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center rounded-sc"
                     >
                       {showPlay ? (
@@ -443,7 +443,7 @@ export default function HomeView({
                       loading="lazy"
                     />
                     <button
-                      onClick={() => onTrackPlay(track)}
+                      onClick={() => onTrackPlay(track, newReleases)}
                       className="absolute inset-0 bg-black/60 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center rounded-sc"
                     >
                       {showPlay ? (

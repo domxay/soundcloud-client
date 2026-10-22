@@ -129,27 +129,53 @@ function AppContent() {
     };
   }, [currentLyricsData, currentTime]);
 
-  const handleNext = useCallback(() => {
-    const nextTrack = queueService.next();
+  const handleNext = useCallback((forceSkipRepeat = true) => {
+    let nextTrack = queueService.next(forceSkipRepeat);
+    if (!nextTrack && tracks.length > 0) {
+      const currentId = currentTrack?.id;
+      const curIdx = tracks.findIndex((t) => t.id === currentId);
+      if (curIdx !== -1 && curIdx + 1 < tracks.length) {
+        nextTrack = tracks[curIdx + 1];
+        queueService.play(nextTrack, tracks);
+      } else if (repeatMode === 'all' || tracks.length > 1) {
+        nextTrack = tracks[0];
+        queueService.play(nextTrack, tracks);
+      }
+    }
     if (nextTrack) {
       setCurrentTrack(nextTrack);
-      setDuration(nextTrack.duration);
+      setDuration(nextTrack.duration || 0);
+      setProgress(0);
+      setCurrentTime(0);
       audioService.playTrack(nextTrack);
     }
-  }, []);
+  }, [currentTrack, tracks, repeatMode]);
 
   const handlePrev = useCallback(() => {
     if (currentTime > 3) {
       audioService.seek(0);
       return;
     }
-    const prevTrack = queueService.prev();
+    let prevTrack = queueService.prev(true);
+    if (!prevTrack && tracks.length > 0) {
+      const currentId = currentTrack?.id;
+      const curIdx = tracks.findIndex((t) => t.id === currentId);
+      if (curIdx > 0) {
+        prevTrack = tracks[curIdx - 1];
+        queueService.play(prevTrack, tracks);
+      } else if (repeatMode === 'all') {
+        prevTrack = tracks[tracks.length - 1];
+        queueService.play(prevTrack, tracks);
+      }
+    }
     if (prevTrack) {
       setCurrentTrack(prevTrack);
-      setDuration(prevTrack.duration);
+      setDuration(prevTrack.duration || 0);
+      setProgress(0);
+      setCurrentTime(0);
       audioService.playTrack(prevTrack);
     }
-  }, [currentTime]);
+  }, [currentTime, currentTrack, tracks, repeatMode]);
 
   // Sync state to floating desktop overlay
   useEffect(() => {
@@ -176,8 +202,18 @@ function AppContent() {
 
   // Handle incoming commands from Desktop Floating Overlay
   useEffect(() => {
+    let lastCmdAction = '';
+    let lastCmdTime = 0;
+
     const handleOverlayCommand = (cmd: { action: string; payload?: any }) => {
       if (!cmd) return;
+      const now = Date.now();
+      if (cmd.action === lastCmdAction && now - lastCmdTime < 200) {
+        return;
+      }
+      lastCmdAction = cmd.action;
+      lastCmdTime = now;
+
       switch (cmd.action) {
         case 'play-pause':
           if (!authService.isAuthenticated()) {
@@ -192,7 +228,7 @@ function AppContent() {
           }
           break;
         case 'next':
-          handleNext();
+          handleNext(true);
           break;
         case 'prev':
           handlePrev();
@@ -349,10 +385,17 @@ function AppContent() {
 
   useEffect(() => {
     audioService.setOnEnded(() => {
-      handleNext();
+      if (repeatMode === 'one') {
+        if (currentTrack) {
+          audioService.seek(0);
+          audioService.togglePlay();
+        }
+      } else {
+        handleNext(false);
+      }
     });
     audioService.setRepeat(repeatMode === 'one');
-  }, [handleNext, repeatMode]);
+  }, [handleNext, repeatMode, currentTrack]);
 
   const loadUserData = useCallback(async () => {
     if (!authService.isAuthenticated()) {
@@ -395,7 +438,9 @@ function AppContent() {
         }
       }
     } else {
-      queueService.play(track, list && list.length > 0 ? list : tracks);
+      const effectiveList = list && list.length > 0 ? list : tracks.length > 0 ? tracks : [track];
+      setTracks(effectiveList);
+      queueService.play(track, effectiveList);
       setCurrentTrack(track);
       setDuration(track.duration || 0);
       setProgress(0);
@@ -562,7 +607,7 @@ function AppContent() {
                 currentTrackId={currentTrack?.id ?? null}
                 isPlaying={isPlaying}
                 downloadingIds={downloadingIds}
-                onTrackPlay={(t) => handleTrackPlay(t)}
+                onTrackPlay={(t, l) => handleTrackPlay(t, l)}
                 onLikeToggle={handleLikeToggle}
                 onDownload={handleDownload}
                 onSelectPlaylist={handleSelectPlaylist}
@@ -594,7 +639,7 @@ function AppContent() {
                 currentTrackId={currentTrack?.id ?? null}
                 isPlaying={isPlaying}
                 downloadingIds={downloadingIds}
-                onTrackPlay={(t) => handleTrackPlay(t)}
+                onTrackPlay={(t, l) => handleTrackPlay(t, l)}
                 onLikeToggle={handleLikeToggle}
                 onDownload={handleDownload}
                 onSelectPlaylist={handleSelectPlaylist}
@@ -609,7 +654,7 @@ function AppContent() {
                 currentTrackId={currentTrack?.id ?? null}
                 isPlaying={isPlaying}
                 downloadingIds={downloadingIds}
-                onTrackPlay={(t) => handleTrackPlay(t)}
+                onTrackPlay={(t, l) => handleTrackPlay(t, l)}
                 onLikeToggle={handleLikeToggle}
                 onDownload={handleDownload}
                 onSelectPlaylist={handleSelectPlaylist}
@@ -667,7 +712,7 @@ function AppContent() {
                 currentTrackId={currentTrack?.id ?? null}
                 isPlaying={isPlaying}
                 downloadingIds={downloadingIds}
-                onTrackPlay={(t) => handleTrackPlay(t)}
+                onTrackPlay={(t, l) => handleTrackPlay(t, l)}
                 onLikeToggle={handleLikeToggle}
                 onDownload={handleDownload}
                 onOpenLogin={() => setIsLoginModalOpen(true)}
@@ -699,7 +744,7 @@ function AppContent() {
                     tracks={tracks}
                     currentTrackId={currentTrack?.id ?? null}
                     isPlaying={isPlaying}
-                    onTrackPlay={(t) => handleTrackPlay(t)}
+                    onTrackPlay={(t, l) => handleTrackPlay(t, l || tracks)}
                     onLikeToggle={handleLikeToggle}
                     downloadingIds={downloadingIds}
                     onDownload={handleDownload}

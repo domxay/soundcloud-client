@@ -24,6 +24,7 @@ export class AudioService {
   private repeatMode: boolean = false;
   private speed: number = 1.0;
   private lastNonZeroVolume: number = 75;
+  private currentPlaySessionId: number = 0;
 
   // Sleep Timer
   private sleepTimerId: any = null;
@@ -199,9 +200,14 @@ export class AudioService {
   }
 
   private notify(): void {
-    const duration = this.audio.duration || this.currentTrack?.duration || 0;
-    const currentTime = this.audio.currentTime || 0;
-    const progress = duration > 0 ? currentTime / duration : 0;
+    const rawAudioDur = this.audio.duration;
+    const duration = (isFinite(rawAudioDur) && rawAudioDur > 0)
+      ? rawAudioDur
+      : (this.currentTrack?.duration || 0);
+    const currentTime = isFinite(this.audio.currentTime) ? this.audio.currentTime : 0;
+    const progress = (duration > 0 && isFinite(duration))
+      ? Math.min(1, Math.max(0, currentTime / duration))
+      : 0;
     let sleepSeconds: number | null = null;
     if (this.sleepTimerEndsAt) {
       sleepSeconds = Math.max(0, Math.round((this.sleepTimerEndsAt - Date.now()) / 1000));
@@ -286,25 +292,47 @@ export class AudioService {
   }
 
   public async playTrack(track: Track, forceRefresh = false): Promise<void> {
+    const sessionId = ++this.currentPlaySessionId;
     this.currentTrack = track;
+    this.isPlaying = false;
 
+    // Fully tear down prior HLS instance without leaving orphaned media bindings
     if (this.hls) {
-      this.hls.destroy();
+      try {
+        this.hls.stopLoad();
+        this.hls.detachMedia();
+        this.hls.destroy();
+      } catch {}
       this.hls = null;
     }
 
-    this.audio.currentTime = 0;
+    try {
+      this.audio.pause();
+      this.audio.removeAttribute('src');
+      this.audio.load();
+    } catch {}
+
+    this.notify();
 
     const streamUrl = await this.getStreamUrlWithRetry(track, 3, forceRefresh);
+    if (sessionId !== this.currentPlaySessionId) {
+      // Discard: newer track was requested while resolving stream URL
+      return;
+    }
+
     if (!streamUrl) {
       if (this.onEndedCallback) {
-        setTimeout(() => this.onEndedCallback?.(), 0);
+        setTimeout(() => {
+          if (sessionId === this.currentPlaySessionId) {
+            this.onEndedCallback?.();
+          }
+        }, 300);
       }
       return;
     }
 
     if (streamUrl.includes('.m3u8') && Hls.isSupported()) {
-      this.hls = new Hls({
+      const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
         maxBufferLength: 45,
@@ -315,8 +343,10 @@ export class AudioService {
         fragLoadingTimeOut: 18000,
         fragLoadingMaxRetry: 6,
       });
+      this.hls = hls;
 
-      this.hls.on(Hls.Events.ERROR, async (_event, data) => {
+      hls.on(Hls.Events.ERROR, async (_event, data) => {
+        if (sessionId !== this.currentPlaySessionId) return;
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
@@ -326,37 +356,50 @@ export class AudioService {
                 (data.response.code === 403 || data.response.code === 404)
               ) {
                 const freshUrl = await soundcloudApi.getTrackStreamUrl(this.currentTrack, true);
-                if (freshUrl && this.hls) {
-                  this.hls.loadSource(freshUrl);
-                  this.hls.startLoad();
+                if (sessionId === this.currentPlaySessionId && freshUrl && this.hls === hls) {
+                  hls.loadSource(freshUrl);
+                  hls.startLoad();
                   return;
                 }
               }
-              this.hls?.startLoad();
+              hls.startLoad();
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
-              this.hls?.recoverMediaError();
+              hls.recoverMediaError();
               break;
             default:
-              this.hls?.destroy();
-              this.hls = null;
+              hls.destroy();
+              if (this.hls === hls) this.hls = null;
               break;
           }
         }
       });
 
-      this.hls.loadSource(streamUrl);
-      this.hls.attachMedia(this.audio);
-      this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      hls.loadSource(streamUrl);
+      hls.attachMedia(this.audio);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        if (sessionId !== this.currentPlaySessionId) return;
         this.audio.playbackRate = this.speed;
-        this.audio.currentTime = 0;
-        this.audio.play().catch(() => {});
+        const p = this.audio.play();
+        if (p !== undefined) {
+          p.catch((err) => {
+            if (err?.name !== 'AbortError') {
+              console.warn('[Audio] play error:', err);
+            }
+          });
+        }
       });
     } else {
       this.audio.src = streamUrl;
       this.audio.playbackRate = this.speed;
-      this.audio.currentTime = 0;
-      this.audio.play().catch(() => {});
+      const p = this.audio.play();
+      if (p !== undefined) {
+        p.catch((err) => {
+          if (err?.name !== 'AbortError') {
+            console.warn('[Audio] play error:', err);
+          }
+        });
+      }
     }
   }
 
@@ -364,33 +407,55 @@ export class AudioService {
     if (this.isPlaying) {
       this.audio.pause();
     } else {
-      const duration = this.audio.duration || this.currentTrack?.duration || 0;
+      const rawAudioDur = this.audio.duration;
+      const duration = (isFinite(rawAudioDur) && rawAudioDur > 0)
+        ? rawAudioDur
+        : (this.currentTrack?.duration || 0);
+
       if (
         this.audio.ended ||
-        (duration > 0 && this.audio.currentTime >= duration - 0.5)
+        (duration > 0 && isFinite(this.audio.currentTime) && this.audio.currentTime >= duration - 0.5)
       ) {
         this.audio.currentTime = 0;
       }
-      this.audio.play().catch(async () => {
-        if (this.currentTrack) {
-          await this.playTrack(this.currentTrack, true);
-        }
-      });
+      const p = this.audio.play();
+      if (p !== undefined) {
+        p.catch(async () => {
+          if (this.currentTrack) {
+            await this.playTrack(this.currentTrack, true);
+          }
+        });
+      }
     }
   }
 
   public seek(progress: number): void {
-    const duration = this.audio.duration || this.currentTrack?.duration || 0;
-    if (duration > 0) {
-      this.audio.currentTime = progress * duration;
+    const rawAudioDur = this.audio.duration;
+    const duration = (isFinite(rawAudioDur) && rawAudioDur > 0)
+      ? rawAudioDur
+      : (this.currentTrack?.duration || 0);
+
+    if (duration > 0 && isFinite(duration)) {
+      const clampedRatio = Math.max(0, Math.min(1, progress));
+      const targetTime = Math.max(0, Math.min(duration - 0.2, clampedRatio * duration));
+      if (isFinite(targetTime)) {
+        this.audio.currentTime = targetTime;
+      }
     }
   }
 
   public seekBy(deltaSeconds: number): void {
-    const duration = this.audio.duration || this.currentTrack?.duration || 0;
-    if (duration > 0) {
-      const nextTime = Math.max(0, Math.min(duration, this.audio.currentTime + deltaSeconds));
-      this.audio.currentTime = nextTime;
+    const rawAudioDur = this.audio.duration;
+    const duration = (isFinite(rawAudioDur) && rawAudioDur > 0)
+      ? rawAudioDur
+      : (this.currentTrack?.duration || 0);
+
+    if (duration > 0 && isFinite(duration)) {
+      const cur = isFinite(this.audio.currentTime) ? this.audio.currentTime : 0;
+      const nextTime = Math.max(0, Math.min(duration - 0.2, cur + deltaSeconds));
+      if (isFinite(nextTime)) {
+        this.audio.currentTime = nextTime;
+      }
     }
   }
 

@@ -124,10 +124,10 @@ class QueueService {
     this.notify();
   }
 
-  public next(): Track | null {
+  public next(forceSkipRepeat = false): Track | null {
     if (this.state.items.length === 0) return null;
 
-    if (this.state.repeat === 'one' && this.state.currentIndex >= 0) {
+    if (!forceSkipRepeat && this.state.repeat === 'one' && this.state.currentIndex >= 0) {
       return this.state.items[this.state.currentIndex];
     }
 
@@ -140,7 +140,7 @@ class QueueService {
       return track;
     }
 
-    if (this.state.repeat === 'all' && this.state.items.length > 0) {
+    if ((this.state.repeat === 'all' || forceSkipRepeat) && this.state.items.length > 0) {
       this.state.currentIndex = 0;
       const track = this.state.items[0];
       this.state.history.push(track.id);
@@ -151,7 +151,7 @@ class QueueService {
     return null;
   }
 
-  public prev(): Track | null {
+  public prev(forceSkipRepeat = false): Track | null {
     if (this.state.items.length === 0) return null;
 
     const prevIndex = this.state.currentIndex - 1;
@@ -162,7 +162,7 @@ class QueueService {
       return track;
     }
 
-    if (this.state.repeat === 'all' && this.state.items.length > 0) {
+    if ((this.state.repeat === 'all' || forceSkipRepeat) && this.state.items.length > 0) {
       this.state.currentIndex = this.state.items.length - 1;
       const track = this.state.items[this.state.currentIndex];
       this.notify();

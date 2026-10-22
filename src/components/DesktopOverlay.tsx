@@ -238,6 +238,7 @@ export default function DesktopOverlay() {
   const handleAction = (action: string, payload?: any) => {
     if (window.electronAPI?.sendOverlayAction) {
       window.electronAPI.sendOverlayAction(action, payload);
+      return;
     }
     try {
       const bc = new BroadcastChannel('sc_overlay_channel');
