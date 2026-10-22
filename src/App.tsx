@@ -29,11 +29,6 @@ import { CheckCircle2, Info, AlertCircle } from 'lucide-react';
 
 function AppContent() {
   const navigate = useNavigate();
-  const location = useLocation();
-
-  if (location.pathname === '/overlay') {
-    return <DesktopOverlay />;
-  }
 
   const [currentPlaylist, setCurrentPlaylist] = useState<Playlist>(emptyPlaylist);
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -164,7 +159,7 @@ function AppContent() {
       duration,
       activeLyric: activeLyricInfo.activeLyric,
       nextLyric: activeLyricInfo.nextLyric,
-      themeAccent: themeService.getCurrentTheme().accent,
+      themeAccent: themeService.getTheme()?.colors?.accent || '#ff5500',
     };
 
     if (window.electronAPI?.sendOverlayState) {
@@ -812,7 +807,10 @@ function AppContent() {
 function App() {
   return (
     <HashRouter>
-      <AppContent />
+      <Routes>
+        <Route path="/overlay" element={<DesktopOverlay />} />
+        <Route path="/*" element={<AppContent />} />
+      </Routes>
     </HashRouter>
   );
 }

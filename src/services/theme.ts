@@ -305,6 +305,10 @@ export class ThemeService {
     return this.currentTheme;
   }
 
+  public getCurrentTheme(): ThemeDefinition {
+    return this.currentTheme;
+  }
+
   public getAllThemes(): ThemeDefinition[] {
     return THEME_PRESETS;
   }
