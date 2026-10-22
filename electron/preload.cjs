@@ -21,4 +21,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   builtinProxyStop: () => ipcRenderer.invoke('sc:builtin-proxy-stop'),
   builtinProxyStatus: () => ipcRenderer.invoke('sc:builtin-proxy-status'),
   relaunchApp: () => ipcRenderer.invoke('sc:relaunch-app'),
+
+  // Desktop Floating Overlay IPC
+  sendOverlayState: (state) => ipcRenderer.send('sc:overlay-sync-state', state),
+  onOverlayState: (callback) => {
+    const listener = (event, state) => callback(state);
+    ipcRenderer.on('sc:overlay-state', listener);
+    return () => ipcRenderer.removeListener('sc:overlay-state', listener);
+  },
+  sendOverlayAction: (action, payload) => ipcRenderer.send('sc:overlay-action', { action, payload }),
+  onOverlayCommand: (callback) => {
+    const listener = (event, cmd) => callback(cmd);
+    ipcRenderer.on('sc:overlay-command', listener);
+    return () => ipcRenderer.removeListener('sc:overlay-command', listener);
+  },
+  resizeOverlay: (width, height) => ipcRenderer.invoke('sc:resize-overlay', { width, height }),
+  restoreMainWindow: () => ipcRenderer.invoke('sc:restore-main-window'),
+  toggleOverlay: (show) => ipcRenderer.invoke('sc:toggle-overlay', show),
 });

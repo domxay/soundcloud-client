@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Cloud, Key, Check, LogOut, ShieldCheck, RefreshCw, Sparkles } from 'lucide-react';
+import { X, Cloud, Key, Check, LogOut, ShieldCheck, RefreshCw, Lock, Sparkles, ExternalLink } from 'lucide-react';
 import { authService } from '@/services/auth';
 import { soundcloudApi } from '@/services/api';
 
@@ -7,15 +7,17 @@ interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess: () => void;
+  required?: boolean;
 }
 
-export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginModalProps) {
+export default function LoginModal({ isOpen, onClose, onLoginSuccess, required = false }: LoginModalProps) {
   const session = authService.getSession();
   const [token, setToken] = useState(session.oauthToken || '');
   const [clientId, setClientId] = useState(session.clientId || '');
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
+  const [showManual, setShowManual] = useState(false);
   const [detectedProxy, setDetectedProxy] = useState<{ success: boolean; proxy?: string; name?: string } | null>(null);
 
   useEffect(() => {
@@ -32,15 +34,40 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !required) onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, required]);
 
   if (!isOpen) return null;
 
-  const handleAutoSync = async () => {
+  const handleBrowserLogin = async () => {
+    if (window.electronAPI?.openLoginWindow) {
+      setLoading(true);
+      setError('');
+      try {
+        const result = await window.electronAPI.openLoginWindow();
+        if (result.success && result.token) {
+          authService.setSession(result.token, result.clientId);
+          const user = await soundcloudApi.getCurrentUser();
+          if (user) authService.setUser(user);
+          onLoginSuccess();
+          onClose();
+        } else {
+          setError(result.error || 'Окно авторизации было закрыто.');
+        }
+      } catch (err: any) {
+        setError(err.message || 'Ошибка подключения к серверу авторизации.');
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      setError('Официальное окно входа доступно в настольном приложении.');
+    }
+  };
+
+  const handleSyncSession = async () => {
     setSyncing(true);
     setError('');
     try {
@@ -51,10 +78,10 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         onLoginSuccess();
         onClose();
       } else {
-        setError(res.error || 'Сессия не найдена. Нажмите «Войти через браузерное окно».');
+        setError(res.error || 'Активная сессия не обнаружена. Воспользуйтесь кнопкой «Войти через аккаунт SoundCloud».');
       }
     } catch (err: any) {
-      setError(err?.message || 'Ошибка авто-синхронизации');
+      setError(err?.message || 'Не удалось синхронизировать сессию.');
     } finally {
       setSyncing(false);
     }
@@ -62,7 +89,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
 
   const handleManualSave = async () => {
     if (!token.trim()) {
-      setError('Пожалуйста, введите корректный OAuth токен.');
+      setError('Введите действительный токен авторизации SoundCloud (OAuth Token).');
       return;
     }
     setLoading(true);
@@ -76,34 +103,9 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       onLoginSuccess();
       onClose();
     } catch {
-      setError('Не удалось подключиться. Проверьте OAuth токен или настройки VPN/прокси.');
+      setError('Не удалось подтвердить токен. Проверьте правильность ключа или статус VPN/прокси.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleWebviewLogin = async () => {
-    if ((window as any).electronAPI?.openLoginWindow) {
-      setLoading(true);
-      setError('');
-      try {
-        const result = await (window as any).electronAPI.openLoginWindow();
-        if (result.success && result.token) {
-          authService.setSession(result.token, result.clientId);
-          const user = await soundcloudApi.getCurrentUser();
-          if (user) authService.setUser(user);
-          onLoginSuccess();
-          onClose();
-        } else {
-          setError(result.error || 'Авторизация отменена пользователем');
-        }
-      } catch (err: any) {
-        setError(err.message || 'Ошибка входа');
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      setError('Браузерный вход доступен в настольной версии приложения.');
     }
   };
 
@@ -114,127 +116,172 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     onClose();
   };
 
+  const isAuth = authService.isAuthenticated();
+
   return (
     <div
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+      onClick={() => {
+        if (!required) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md rounded-sc border border-sc-border bg-sc-surface p-6 shadow-2xl"
+        className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#161616] p-6 shadow-2xl text-white"
       >
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 text-sc-text-secondary hover:text-white transition-colors"
-        >
-          <X size={20} />
-        </button>
+        {!required && (
+          <button
+            onClick={onClose}
+            className="absolute right-4 top-4 text-zinc-400 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10"
+            title="Закрыть"
+          >
+            <X size={18} />
+          </button>
+        )}
 
-        <div className="flex items-center gap-3 mb-5">
-          <Cloud size={32} className="text-sc-accent" fill="currentColor" />
+        {/* Header */}
+        <div className="flex items-center gap-3.5 mb-5">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#ff5500] to-[#e64400] flex items-center justify-center shadow-lg shadow-[#ff5500]/20 shrink-0">
+            <Cloud size={28} className="text-white" fill="white" />
+          </div>
           <div>
-            <h2 className="text-lg font-bold text-white">Вход в аккаунт SoundCloud</h2>
-            <p className="text-xs text-sc-text-secondary">Синхронизация лайков, плейлистов и стрима</p>
+            <h2 className="text-lg font-bold tracking-tight text-white">Вход в аккаунт SoundCloud</h2>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              Для воспроизведения музыки и доступа к медиатеке
+            </p>
           </div>
         </div>
 
-        {authService.isAuthenticated() && (
-          <div className="mb-5 rounded-sc bg-[#162a1b] border border-[#2b5934] p-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Check size={18} className="text-[#3ed465]" />
-              <span className="text-sm text-[#a4efb7]">
-                Вы вошли как <strong className="text-white">{session.user?.username || 'Пользователь'}</strong>
+        {/* Authenticated Banner */}
+        {isAuth && (
+          <div className="mb-4 rounded-xl bg-emerald-950/40 border border-emerald-800/60 p-3 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <Check size={14} />
+              </div>
+              <span className="text-xs text-emerald-300">
+                Вы авторизованы как <strong className="text-white">{session.user?.username || 'SoundCloud User'}</strong>
               </span>
             </div>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 font-medium"
+              className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 font-medium px-2 py-1 rounded hover:bg-white/5 transition-colors"
             >
-              <LogOut size={14} />
-              Выйти
+              <LogOut size={13} />
+              <span>Выйти</span>
             </button>
           </div>
         )}
 
+        {/* Required Notification Banner */}
+        {!isAuth && (
+          <div className="mb-4 rounded-xl bg-[#201510] border border-[#ff5500]/30 p-3 flex items-start gap-2.5 text-xs">
+            <Lock size={15} className="text-[#ff5500] shrink-0 mt-0.5" />
+            <div className="text-zinc-300 leading-snug">
+              Воспроизведение треков, плейлисты и синхронизация лайков доступны после входа в ваш профиль SoundCloud.
+            </div>
+          </div>
+        )}
+
+        {/* Proxy notification if detected */}
         {detectedProxy && (
-          <div className="mb-4 rounded-sc bg-sc-bg border border-sc-border p-3 text-xs flex items-start gap-2.5">
-            <ShieldCheck size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+          <div className="mb-4 rounded-xl bg-zinc-900/90 border border-white/5 p-3 text-xs flex items-start gap-2.5">
+            <ShieldCheck size={15} className="text-emerald-400 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-white font-medium">Обнаружен обход блокировок: {detectedProxy.name}</p>
-              <p className="text-[11px] text-sc-text-secondary mt-0.5 leading-snug">
-                Если SoundCloud недоступен, включите Clash Verge в режим <strong>Rule</strong> или <strong>Global</strong>.
+              <p className="text-white font-medium">Маршрут подключения: {detectedProxy.name}</p>
+              <p className="text-[11px] text-zinc-400 mt-0.5 leading-snug">
+                Если поток не загружается, проверьте активность VPN или переключите Clash Verge в режим Rule/Global.
               </p>
             </div>
           </div>
         )}
 
-        <div className="space-y-3.5">
+        {/* Actions */}
+        <div className="space-y-2.5">
           <button
-            onClick={handleAutoSync}
-            disabled={syncing || loading}
-            className="w-full flex items-center justify-center gap-2 rounded-sc bg-emerald-600/90 hover:bg-emerald-500 py-2.5 px-4 text-sm font-bold text-white transition-all disabled:opacity-50 shadow-md"
-          >
-            <Sparkles size={16} />
-            <span>{syncing ? 'Синхронизация сессии...' : '1-Клик Авто-Синхронизация (из куков)'}</span>
-          </button>
-
-          <button
-            onClick={handleWebviewLogin}
+            onClick={handleBrowserLogin}
             disabled={loading || syncing}
-            className="w-full flex items-center justify-center gap-2 rounded-sc bg-sc-accent py-2.5 px-4 text-sm font-bold text-white transition-colors hover:bg-sc-accent-hover disabled:opacity-50 shadow-md"
+            className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-[#ff5500] hover:bg-[#ff6600] active:scale-[0.99] py-3 px-4 text-sm font-bold text-white transition-all disabled:opacity-50 shadow-lg shadow-[#ff5500]/25"
           >
             <Cloud size={18} fill="white" />
-            <span>Войти через официальное окно SoundCloud</span>
+            <span>{loading ? 'Подключение к SoundCloud...' : 'Войти через аккаунт SoundCloud'}</span>
           </button>
 
-          <div className="flex items-center gap-3 my-2">
-            <div className="flex-1 h-px bg-sc-border" />
-            <span className="text-[11px] text-sc-text-secondary uppercase">Или ручной ввод токена</span>
-            <div className="flex-1 h-px bg-sc-border" />
+          <button
+            onClick={handleSyncSession}
+            disabled={syncing || loading}
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-zinc-800/90 hover:bg-zinc-700/90 border border-white/10 active:scale-[0.99] py-2.5 px-4 text-xs font-semibold text-zinc-200 transition-all disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={syncing ? 'animate-spin text-[#ff5500]' : 'text-zinc-400'} />
+            <span>{syncing ? 'Синхронизация сессии...' : 'Синхронизировать сессию браузера'}</span>
+          </button>
+
+          {/* Collapsible Manual Credentials */}
+          <div className="pt-2">
+            <button
+              onClick={() => setShowManual(!showManual)}
+              type="button"
+              className="w-full text-center text-xs text-zinc-400 hover:text-zinc-200 transition-colors py-1 flex items-center justify-center gap-1.5"
+            >
+              <span>{showManual ? 'Скрыть ручной ввод' : 'Ручной ввод токена сессии'}</span>
+            </button>
+
+            {showManual && (
+              <div className="mt-3 space-y-3 pt-3 border-t border-white/10 animate-fade-in">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">OAuth Token</label>
+                  <div className="relative">
+                    <Key size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                    <input
+                      type="text"
+                      value={token}
+                      onChange={(e) => setToken(e.target.value)}
+                      placeholder="OAuth 2-xxxx или JWT токен"
+                      className="w-full rounded-lg border border-white/10 bg-zinc-900/90 py-2 pl-9 pr-3 text-xs text-white placeholder:text-zinc-600 focus:border-[#ff5500] focus:outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">Client ID</label>
+                  <input
+                    type="text"
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    placeholder="SoundCloud client_id"
+                    className="w-full rounded-lg border border-white/10 bg-zinc-900/90 py-2 px-3 text-xs text-white placeholder:text-zinc-600 focus:border-[#ff5500] focus:outline-none font-mono text-[11px] transition-colors"
+                  />
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    onClick={handleManualSave}
+                    disabled={loading || syncing}
+                    className="rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-[#ff5500]/40 px-4 py-1.5 text-xs font-bold text-[#ff5500] hover:text-white transition-colors disabled:opacity-50"
+                  >
+                    Применить ключ
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-sc-text-secondary mb-1">OAuth Token</label>
-            <div className="relative">
-              <Key size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-sc-text-secondary" />
-              <input
-                type="text"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder="OAuth 2-xxxx или JWT токен"
-                className="w-full rounded-sc border border-sc-border bg-sc-bg py-2 pl-9 pr-3 text-sm text-white placeholder:text-sc-text-secondary focus:border-sc-accent focus:outline-none"
-              />
+          {error && (
+            <p className="text-xs text-red-400 mt-2 font-medium bg-red-950/30 border border-red-900/50 rounded-lg p-2.5">
+              {error}
+            </p>
+          )}
+
+          {!required && (
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={onClose}
+                className="text-xs text-zinc-400 hover:text-white transition-colors px-3 py-1.5"
+              >
+                Продолжить без входа
+              </button>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-sc-text-secondary mb-1">Client ID</label>
-            <input
-              type="text"
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              placeholder="SoundCloud client_id"
-              className="w-full rounded-sc border border-sc-border bg-sc-bg py-2 px-3 text-sm text-white placeholder:text-sc-text-secondary focus:border-sc-accent focus:outline-none font-mono text-xs"
-            />
-          </div>
-
-          {error && <p className="text-xs text-red-400 mt-2 font-medium">{error}</p>}
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              onClick={onClose}
-              className="rounded-sc border border-sc-border px-4 py-2 text-sm text-sc-text-secondary hover:text-white hover:bg-sc-hover"
-            >
-              Отмена
-            </button>
-            <button
-              onClick={handleManualSave}
-              disabled={loading || syncing}
-              className="rounded-sc bg-sc-surface border border-sc-accent px-5 py-2 text-sm font-semibold text-sc-accent hover:bg-sc-accent hover:text-white transition-colors disabled:opacity-50"
-            >
-              Сохранить
-            </button>
-          </div>
+          )}
         </div>
       </div>
     </div>

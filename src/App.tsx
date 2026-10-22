@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import Header from '@/components/Header';
 import HomeView from '@/components/HomeView';
 import PlaylistHero from '@/components/PlaylistHero';
@@ -14,8 +14,9 @@ import PlaylistsView from '@/components/PlaylistsView';
 import CommentsModal from '@/components/CommentsModal';
 import LyricsModal from '@/components/LyricsModal';
 import ThemeSettingsModal from '@/components/ThemeSettingsModal';
+import DesktopOverlay from '@/components/DesktopOverlay';
 import { FeedView, SearchResultsView, SettingsView, TrackPageView, ArtistView } from '@/views';
-import { Track, Playlist, DownloadItem, UserProfile, Comment, ToastNotification } from '@/types';
+import { Track, Playlist, DownloadItem, UserProfile, Comment, ToastNotification, OverlayState, LyricsData } from '@/types';
 import { emptyPlaylist } from '@/data';
 import { audioService } from '@/services/audio';
 import { soundcloudApi } from '@/services/api';
@@ -23,10 +24,17 @@ import { downloaderService } from '@/services/downloader';
 import { authService } from '@/services/auth';
 import { themeService, CustomBackground } from '@/services/theme';
 import { queueService } from '@/services/queue';
+import { lyricsService } from '@/services/lyrics';
 import { CheckCircle2, Info, AlertCircle } from 'lucide-react';
 
 function AppContent() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  if (location.pathname === '/overlay') {
+    return <DesktopOverlay />;
+  }
+
   const [currentPlaylist, setCurrentPlaylist] = useState<Playlist>(emptyPlaylist);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
@@ -54,14 +62,75 @@ function AppContent() {
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [customBg, setCustomBg] = useState<CustomBackground>(themeService.getBackground());
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
+  const [currentLyricsData, setCurrentLyricsData] = useState<LyricsData | null>(null);
 
-  const addToast = (message: string, type: 'info' | 'success' | 'warning' = 'info') => {
+  const addToast = (
+    message: string,
+    type: 'info' | 'success' | 'warning' | 'error' = 'info'
+  ) => {
     const id = `${Date.now()}_${Math.random()}`;
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 3500);
   };
+
+  // Auth gate check on startup: require account authorization
+  useEffect(() => {
+    if (!authService.isAuthenticated()) {
+      setIsLoginModalOpen(true);
+    }
+  }, []);
+
+  // Fetch track lyrics in real time for desktop overlay and lyrics player
+  useEffect(() => {
+    if (!currentTrack) {
+      setCurrentLyricsData(null);
+      return;
+    }
+    let isCurrent = true;
+    lyricsService
+      .fetchLyrics(
+        currentTrack.title,
+        currentTrack.artist,
+        currentTrack.id,
+        currentTrack.description,
+        currentTrack.duration
+      )
+      .then((data) => {
+        if (isCurrent) setCurrentLyricsData(data);
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [currentTrack]);
+
+  // Compute active lyrics line for synchronization
+  const activeLyricInfo = useMemo(() => {
+    if (!currentLyricsData?.lines || currentLyricsData.lines.length === 0) {
+      return { activeLyric: '', nextLyric: '' };
+    }
+    const offset = 0.45;
+    const t = currentTime + offset;
+    let activeIdx = -1;
+    for (let i = 0; i < currentLyricsData.lines.length; i++) {
+      if (t >= currentLyricsData.lines[i].time) {
+        activeIdx = i;
+      } else {
+        break;
+      }
+    }
+    if (activeIdx >= 0) {
+      return {
+        activeLyric: currentLyricsData.lines[activeIdx].text,
+        nextLyric: currentLyricsData.lines[activeIdx + 1]?.text || '',
+      };
+    }
+    return {
+      activeLyric: '',
+      nextLyric: currentLyricsData.lines[0]?.text || '',
+    };
+  }, [currentLyricsData, currentTime]);
 
   const handleNext = useCallback(() => {
     const nextTrack = queueService.next();
@@ -85,6 +154,81 @@ function AppContent() {
     }
   }, [currentTime]);
 
+  // Sync state to floating desktop overlay
+  useEffect(() => {
+    const overlayState: OverlayState = {
+      track: currentTrack,
+      isPlaying,
+      progress,
+      currentTime,
+      duration,
+      activeLyric: activeLyricInfo.activeLyric,
+      nextLyric: activeLyricInfo.nextLyric,
+      themeAccent: themeService.getCurrentTheme().accent,
+    };
+
+    if (window.electronAPI?.sendOverlayState) {
+      window.electronAPI.sendOverlayState(overlayState);
+    }
+    try {
+      const bc = new BroadcastChannel('sc_overlay_channel');
+      bc.postMessage({ type: 'state', payload: overlayState });
+      bc.close();
+    } catch {}
+  }, [currentTrack, isPlaying, progress, currentTime, duration, activeLyricInfo]);
+
+  // Handle incoming commands from Desktop Floating Overlay
+  useEffect(() => {
+    const handleOverlayCommand = (cmd: { action: string; payload?: any }) => {
+      if (!cmd) return;
+      switch (cmd.action) {
+        case 'play-pause':
+          if (!authService.isAuthenticated()) {
+            setIsLoginModalOpen(true);
+            addToast('Для воспроизведения музыки необходимо войти в аккаунт SoundCloud', 'error');
+            return;
+          }
+          if (currentTrack) {
+            audioService.togglePlay();
+          } else if (tracks.length > 0) {
+            handleTrackPlay(tracks[0]);
+          }
+          break;
+        case 'next':
+          handleNext();
+          break;
+        case 'prev':
+          handlePrev();
+          break;
+        case 'seek':
+          if (typeof cmd.payload === 'number') {
+            audioService.seek(cmd.payload);
+          }
+          break;
+      }
+    };
+
+    let unsub: (() => void) | undefined;
+    if (window.electronAPI?.onOverlayCommand) {
+      unsub = window.electronAPI.onOverlayCommand(handleOverlayCommand);
+    }
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('sc_overlay_channel');
+      bc.onmessage = (e) => {
+        if (e.data?.type === 'action') {
+          handleOverlayCommand({ action: e.data.action, payload: e.data.payload });
+        }
+      };
+    } catch {}
+
+    return () => {
+      if (unsub) unsub();
+      if (bc) bc.close();
+    };
+  }, [currentTrack, tracks, handleNext, handlePrev]);
+
   // Global hotkeys: Space, Left/Right, Up/Down, M, L
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -93,6 +237,11 @@ function AppContent() {
 
       if (e.code === 'Space') {
         e.preventDefault();
+        if (!authService.isAuthenticated()) {
+          setIsLoginModalOpen(true);
+          addToast('Для воспроизведения музыки необходимо войти в аккаунт SoundCloud', 'error');
+          return;
+        }
         audioService.togglePlay();
       } else if (e.code === 'ArrowLeft') {
         e.preventDefault();
@@ -226,6 +375,12 @@ function AppContent() {
   }, [loadUserData]);
 
   const handleTrackPlay = (track: Track, list?: Track[]) => {
+    if (!authService.isAuthenticated()) {
+      setIsLoginModalOpen(true);
+      addToast('Для воспроизведения музыки необходимо войти в аккаунт SoundCloud', 'error');
+      return;
+    }
+
     if (currentTrack?.id === track.id) {
       if (isPlaying) {
         audioService.togglePlay();
@@ -247,6 +402,12 @@ function AppContent() {
   };
 
   const handleSelectPlaylist = (p: Playlist) => {
+    if (!authService.isAuthenticated()) {
+      setIsLoginModalOpen(true);
+      addToast('Для воспроизведения плейлистов необходимо войти в аккаунт SoundCloud', 'error');
+      return;
+    }
+
     setCurrentPlaylist(p);
     setTracks(p.tracks);
     if (p.tracks.length > 0) {
@@ -274,6 +435,11 @@ function AppContent() {
   };
 
   const handlePlayAll = () => {
+    if (!authService.isAuthenticated()) {
+      setIsLoginModalOpen(true);
+      addToast('Для воспроизведения музыки необходимо войти в аккаунт SoundCloud', 'error');
+      return;
+    }
     if (tracks.length === 0) return;
     queueService.play(tracks[0], tracks);
     setCurrentTrack(tracks[0]);
@@ -628,6 +794,8 @@ function AppContent() {
           >
             {t.type === 'success' ? (
               <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+            ) : t.type === 'error' ? (
+              <AlertCircle size={16} className="text-red-400 shrink-0" />
             ) : t.type === 'warning' ? (
               <AlertCircle size={16} className="text-amber-400 shrink-0" />
             ) : (

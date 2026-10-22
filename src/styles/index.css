@@ -14,6 +14,15 @@ body {
   min-height: 100vh;
 }
 
+body.overlay-mode,
+html.overlay-mode {
+  background: transparent !important;
+  background-color: transparent !important;
+  overflow: hidden !important;
+  min-height: 0 !important;
+  height: 100vh !important;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

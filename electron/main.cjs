@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog, session, net, protocol } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, session, net, protocol, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
@@ -25,6 +25,8 @@ try {
 } catch {}
 
 let mainWindow = null;
+let overlayWindow = null;
+let cachedOverlayState = null;
 let currentProxyRule = null;
 let cachedClientId = 'z7SdppGR2n32vjiLbTeRJnOdA3dFn6Nn';
 
@@ -351,6 +353,67 @@ async function testProxyRule(rule) {
   }
 }
 
+function createOverlayWindow() {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    return overlayWindow;
+  }
+
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth } = primaryDisplay.workAreaSize;
+  const overlayWidth = 560;
+  const overlayHeight = 60;
+  const posX = Math.round((screenWidth - overlayWidth) / 2);
+  const posY = 14;
+
+  overlayWindow = new BrowserWindow({
+    title: 'SoundCloud Desktop Island',
+    width: overlayWidth,
+    height: overlayHeight,
+    x: posX,
+    y: posY,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    show: false,
+    hasShadow: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: false,
+    },
+  });
+
+  overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+  overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+  const distPath = path.join(__dirname, '../dist/index.html');
+  if (process.env.VITE_DEV_SERVER_URL) {
+    overlayWindow.loadURL(`${process.env.VITE_DEV_SERVER_URL}#/overlay`);
+  } else if (fs.existsSync(distPath)) {
+    overlayWindow.loadFile(distPath, { hash: '/overlay' });
+  } else {
+    overlayWindow.loadURL('http://localhost:5173/#/overlay').catch(() => {
+      overlayWindow.loadFile(distPath, { hash: '/overlay' });
+    });
+  }
+
+  overlayWindow.webContents.on('did-finish-load', () => {
+    if (cachedOverlayState && overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('sc:overlay-state', cachedOverlayState);
+    }
+  });
+
+  overlayWindow.on('closed', () => {
+    overlayWindow = null;
+  });
+
+  return overlayWindow;
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     title: 'SoundCloud Desktop',
@@ -376,6 +439,23 @@ function createWindow() {
     mainWindow.focus();
   });
 
+  mainWindow.on('minimize', () => {
+    if (cachedOverlayState && (cachedOverlayState.isPlaying || cachedOverlayState.track)) {
+      const win = createOverlayWindow();
+      win.showInactive();
+      win.setAlwaysOnTop(true, 'screen-saver');
+      if (cachedOverlayState) {
+        win.webContents.send('sc:overlay-state', cachedOverlayState);
+      }
+    }
+  });
+
+  mainWindow.on('restore', () => {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.hide();
+    }
+  });
+
   const distPath = path.join(__dirname, '../dist/index.html');
   const proxyConfig = currentProxyRule ? { proxyRules: currentProxyRule } : { mode: 'system' };
   if (mainWindow.webContents.session) {
@@ -397,6 +477,77 @@ function createWindow() {
     return { action: 'deny' };
   });
 }
+
+ipcMain.on('sc:overlay-sync-state', (event, state) => {
+  cachedOverlayState = state;
+  if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.webContents) {
+    overlayWindow.webContents.send('sc:overlay-state', state);
+  }
+});
+
+ipcMain.on('sc:overlay-action', (event, data) => {
+  const { action, payload } = data || {};
+  if (action === 'expand-app' || action === 'restore') {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.hide();
+    }
+    return;
+  }
+  if (action === 'close') {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.hide();
+    }
+    return;
+  }
+  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
+    mainWindow.webContents.send('sc:overlay-command', { action, payload });
+  }
+});
+
+ipcMain.handle('sc:resize-overlay', (event, { width, height }) => {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    try {
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width: screenWidth } = primaryDisplay.workAreaSize;
+      const newX = Math.round((screenWidth - width) / 2);
+      const [, currentY] = overlayWindow.getPosition();
+      overlayWindow.setSize(Math.round(width), Math.round(height));
+      overlayWindow.setPosition(newX, currentY);
+    } catch {}
+  }
+});
+
+ipcMain.handle('sc:restore-main-window', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  }
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.hide();
+  }
+});
+
+ipcMain.handle('sc:toggle-overlay', (event, explicitShow) => {
+  const win = createOverlayWindow();
+  const shouldShow = explicitShow !== undefined ? explicitShow : !win.isVisible();
+  if (shouldShow) {
+    win.showInactive();
+    win.setAlwaysOnTop(true, 'screen-saver');
+    if (cachedOverlayState) {
+      win.webContents.send('sc:overlay-state', cachedOverlayState);
+    }
+    return true;
+  } else {
+    win.hide();
+    return false;
+  }
+});
 
 ipcMain.handle('sc:window-minimize', () => {
   if (mainWindow) mainWindow.minimize();

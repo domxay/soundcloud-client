@@ -110,5 +110,54 @@ export interface LyricsData {
 export interface ToastNotification {
   id: string;
   message: string;
-  type?: 'info' | 'success' | 'warning';
+  type?: 'info' | 'success' | 'warning' | 'error';
 }
+
+export interface OverlayState {
+  track: Track | null;
+  isPlaying: boolean;
+  progress: number;
+  currentTime: number;
+  duration: number;
+  activeLyric?: string;
+  nextLyric?: string;
+  themeAccent?: string;
+}
+
+export interface ElectronAPI {
+  openLoginWindow: () => Promise<{ success: boolean; token?: string; clientId?: string; error?: string }>;
+  syncSession: () => Promise<{ success: boolean; token?: string; clientId?: string; error?: string }>;
+  getClientId: (forceRefresh?: boolean) => Promise<string>;
+  downloadTrack: (trackData: any) => Promise<{ success: boolean; filePath?: string; error?: string }>;
+  openDownloadsFolder: () => Promise<boolean>;
+  minimizeWindow: () => Promise<void>;
+  maximizeWindow: () => Promise<void>;
+  closeWindow: () => Promise<void>;
+  selectSaveFile: (defaultName: string) => Promise<string | null>;
+  selectDownloadFolder: () => Promise<string | null>;
+  selectBackgroundFile: () => Promise<any>;
+  setProxy: (rule: string) => Promise<{ success: boolean; proxy?: string; error?: string }>;
+  testProxy: (rule: string) => Promise<any>;
+  detectLocalProxy: () => Promise<any>;
+  getNetworkSettings: () => Promise<any>;
+  setDoh: (enabled: boolean) => Promise<any>;
+  builtinProxyStart: (port: number) => Promise<any>;
+  builtinProxyStop: () => Promise<any>;
+  builtinProxyStatus: () => Promise<any>;
+  relaunchApp: () => Promise<any>;
+  // Overlay IPC
+  sendOverlayState: (state: OverlayState) => void;
+  onOverlayState: (callback: (state: OverlayState) => void) => () => void;
+  sendOverlayAction: (action: string, payload?: any) => void;
+  onOverlayCommand: (callback: (cmd: { action: string; payload?: any }) => void) => () => void;
+  resizeOverlay: (width: number, height: number) => Promise<void>;
+  restoreMainWindow: () => Promise<void>;
+  toggleOverlay: (show?: boolean) => Promise<boolean>;
+}
+
+declare global {
+  interface Window {
+    electronAPI?: ElectronAPI;
+  }
+}
+

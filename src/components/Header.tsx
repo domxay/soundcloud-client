@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   ShieldAlert,
   RefreshCw,
+  PanelTop,
 } from 'lucide-react';
 import { authService } from '@/services/auth';
 
@@ -228,6 +229,21 @@ export default function Header({
           <span className="hidden sm:inline">Settings</span>
         </button>
 
+        {isElectron && (
+          <button
+            onClick={() => {
+              if (window.electronAPI?.toggleOverlay) {
+                window.electronAPI.toggleOverlay();
+              }
+            }}
+            className="flex items-center gap-1.5 rounded border border-[#282828] bg-[#1a1a1a] px-2.5 py-1 text-xs font-semibold text-zinc-300 hover:border-[#ff5500] hover:text-[#ff5500] transition-all shadow-sm"
+            title="Плавающий оверлей поверх всех окон (Dynamic Island)"
+          >
+            <PanelTop size={13} className="text-[#ff5500]" />
+            <span className="hidden xl:inline">Оверлей</span>
+          </button>
+        )}
+
         <button
           onClick={handleOpenTelegram}
           className="hidden xl:flex items-center gap-1.5 rounded border border-[#282828] bg-[#1a1a1a] px-2.5 py-1 text-xs font-medium text-[#aaaaaa] hover:text-white hover:border-[#444444] transition-all shadow-sm"
@@ -307,11 +323,11 @@ export default function Header({
             <button
               onClick={handleQuickSync}
               disabled={isSyncing}
-              className="hidden sm:flex items-center gap-1 rounded border border-[#333] bg-[#1a1a1a] px-2.5 py-1.5 text-xs font-semibold text-[#ccc] hover:text-white hover:border-[#ff5500] transition-colors"
-              title="1-Click Auto-Sync Session from browser cookies"
+              className="hidden sm:flex items-center gap-1.5 rounded border border-[#333] bg-[#1a1a1a] px-2.5 py-1.5 text-xs font-semibold text-[#ccc] hover:text-white hover:border-[#ff5500] transition-colors"
+              title="Синхронизировать сессию браузера"
             >
               <RefreshCw size={12} className={isSyncing ? 'animate-spin text-[#ff5500]' : ''} />
-              <span>Auto-Sync</span>
+              <span>Синхронизация</span>
             </button>
             <button
               onClick={onOpenLogin}
