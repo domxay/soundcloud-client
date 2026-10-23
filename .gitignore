@@ -22,6 +22,7 @@ release
 *.sln
 *.sw?
 .env
+.ag_buf.txt
 
 resources/requests.txt
 resources/soundcloud-main.zip
