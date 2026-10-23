@@ -11,8 +11,9 @@ import {
   Sliders,
   GripVertical,
   Clock,
-  Gauge,
-  RotateCcw,
+  Volume2,
+  Volume1,
+  VolumeX,
 } from 'lucide-react';
 import { OverlayState } from '@/types';
 import { useI18n } from '@/services/i18n';
@@ -33,7 +34,7 @@ export default function DesktopOverlay() {
     activeLyric: '',
     nextLyric: '',
     themeAccent: '#ff5500',
-    speed: 1.0,
+    volume: 75,
   });
 
   const [mode, setMode] = useState<'compact' | 'expanded'>(() => {
@@ -49,9 +50,9 @@ export default function DesktopOverlay() {
     return saved ? parseInt(saved, 10) : 560;
   });
 
-  // Shape and Playback Speed Drawer State
+  // Shape and Volume Sound Drawer State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [currentSpeed, setCurrentSpeed] = useState<number>(1.0);
+  const [volume, setVolume] = useState<number>(75);
 
   // PC System Time (Local Clock)
   const [systemTime, setSystemTime] = useState(() => new Date());
@@ -63,12 +64,12 @@ export default function DesktopOverlay() {
     return () => clearInterval(timer);
   }, []);
 
-  // Sync incoming speed from App state
+  // Sync incoming volume from App state
   useEffect(() => {
-    if (typeof state.speed === 'number' && state.speed > 0) {
-      setCurrentSpeed(state.speed);
+    if (typeof state.volume === 'number' && !isNaN(state.volume)) {
+      setVolume(state.volume);
     }
-  }, [state.speed]);
+  }, [state.volume]);
 
   // Track scrubber state
   const [isScrubbing, setIsScrubbing] = useState(false);
@@ -275,11 +276,14 @@ export default function DesktopOverlay() {
     } catch {}
   };
 
-  const handleSpeedChange = (val: number) => {
-    const rounded = Math.round(val * 100) / 100;
-    const clamped = Math.max(0.5, Math.min(2.0, rounded));
-    setCurrentSpeed(clamped);
-    handleAction('set-speed', clamped);
+  const handleVolumeChange = (newVol: number) => {
+    const clamped = Math.max(0, Math.min(100, Math.round(newVol)));
+    setVolume(clamped);
+    handleAction('set-volume', clamped);
+  };
+
+  const handleToggleMute = () => {
+    handleAction('toggle-mute');
   };
 
   const handleRestoreApp = () => {
@@ -511,7 +515,7 @@ export default function DesktopOverlay() {
             </button>
           </div>
 
-          {/* Right Utility Buttons: Lyrics Toggle, Shape & Speed Settings, Restore, Close */}
+          {/* Right Utility Buttons: Lyrics Toggle, Shape & Sound Settings, Restore, Close */}
           <div
             data-interactive="true"
             className="flex items-center gap-1 shrink-0 pl-1 border-l border-zinc-800/80"
@@ -528,7 +532,7 @@ export default function DesktopOverlay() {
               <Mic2 size={13} style={mode === 'expanded' ? { color: accent } : undefined} />
             </button>
 
-            {/* Shape & Speed Settings Trigger Button */}
+            {/* Shape & Sound Settings Trigger Button */}
             <button
               onClick={() => setIsSettingsOpen((prev) => !prev)}
               className={`w-7 h-7 flex items-center justify-center rounded-full transition-all relative ${
@@ -537,15 +541,15 @@ export default function DesktopOverlay() {
                   : 'text-zinc-400 hover:text-white hover:bg-white/10'
               }`}
               style={isSettingsOpen ? { color: accent } : undefined}
-              title={`${t('overlaySettings') || 'Настройки формы и скорости'}: ${
+              title={`${t('overlaySettings') || 'Настройки формы и звука'}: ${
                 shapeStyle === 'pill' ? 'Pill' : 'Squircle'
-              } • ${currentSpeed.toFixed(2)}x`}
+              } • ${volume}%`}
             >
               <Sliders size={12} />
-              {currentSpeed !== 1.0 && (
+              {volume === 0 && (
                 <span
-                  className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-black animate-pulse"
-                  style={{ backgroundColor: accent }}
+                  className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-black bg-red-500 animate-pulse"
+                  title="Звук выключен"
                 />
               )}
             </button>
@@ -568,7 +572,7 @@ export default function DesktopOverlay() {
           </div>
         </div>
 
-        {/* Interactive Shape & Speed Quick Drawer */}
+        {/* Interactive Shape & Sound (Volume) Quick Drawer */}
         {isSettingsOpen && (
           <div
             data-interactive="true"
@@ -614,31 +618,44 @@ export default function DesktopOverlay() {
 
             <div className="h-5 w-[1px] bg-zinc-800/80 shrink-0" />
 
-            {/* Playback Speed Controller Slider & Presets */}
+            {/* Volume Sound Controller Slider & Presets */}
             <div className="flex-1 min-w-0 flex items-center gap-2.5">
               <div className="flex items-center gap-1.5 shrink-0">
-                <Gauge size={13} style={{ color: accent }} />
+                <button
+                  type="button"
+                  onClick={handleToggleMute}
+                  className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition-colors"
+                  title={volume === 0 ? 'Включить звук' : 'Выключить звук'}
+                >
+                  {volume === 0 ? (
+                    <VolumeX size={14} className="text-red-400" />
+                  ) : volume < 50 ? (
+                    <Volume1 size={14} style={{ color: accent }} />
+                  ) : (
+                    <Volume2 size={14} style={{ color: accent }} />
+                  )}
+                </button>
                 <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 hidden sm:inline">
-                  {t('overlaySpeed') || 'Скорость'}
+                  {t('overlayVolume') || 'Звук'}
                 </span>
                 <span
-                  className="font-mono text-xs font-bold px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 min-w-[44px] text-center"
-                  style={{ color: currentSpeed !== 1.0 ? accent : '#e4e4e7' }}
-                  title={t('overlaySpeed')}
+                  className="font-mono text-xs font-bold px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 min-w-[38px] text-center"
+                  style={{ color: volume === 0 ? '#ef4444' : accent }}
+                  title={t('overlayVolume')}
                 >
-                  {currentSpeed.toFixed(2)}x
+                  {volume}%
                 </span>
               </div>
 
               {/* Smooth Range Slider */}
-              <div className="flex-1 min-w-[80px] flex items-center relative group/speed">
+              <div className="flex-1 min-w-[80px] flex items-center relative group/vol">
                 <input
                   type="range"
-                  min="0.5"
-                  max="2.0"
-                  step="0.05"
-                  value={currentSpeed}
-                  onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={volume}
+                  onChange={(e) => handleVolumeChange(parseInt(e.target.value, 10))}
                   className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer focus:outline-none"
                   style={{
                     accentColor: accent,
@@ -648,36 +665,28 @@ export default function DesktopOverlay() {
 
               {/* Quick Preset Buttons */}
               <div className="flex items-center gap-1 shrink-0">
-                {[0.8, 1.0, 1.25, 1.5].map((preset) => {
-                  const isActive = Math.abs(currentSpeed - preset) < 0.02;
+                {[
+                  { label: '0%', val: 0 },
+                  { label: '50%', val: 50 },
+                  { label: '100%', val: 100 },
+                ].map((preset) => {
+                  const isActive = volume === preset.val;
                   return (
                     <button
-                      key={preset}
+                      key={preset.label}
                       type="button"
-                      onClick={() => handleSpeedChange(preset)}
+                      onClick={() => handleVolumeChange(preset.val)}
                       className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
                         isActive
                           ? 'bg-zinc-800 text-white font-bold border border-zinc-700'
                           : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'
                       }`}
-                      style={isActive ? { color: preset !== 1.0 ? accent : '#fff' } : undefined}
+                      style={isActive ? { color: accent } : undefined}
                     >
-                      {preset === 1.0 ? '1x' : `${preset}x`}
+                      {preset.label}
                     </button>
                   );
                 })}
-
-                {/* Reset to 1.0x if altered */}
-                {currentSpeed !== 1.0 && (
-                  <button
-                    type="button"
-                    onClick={() => handleSpeedChange(1.0)}
-                    className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
-                    title={t('speedNormal') || 'Сброс на 1.0x'}
-                  >
-                    <RotateCcw size={11} />
-                  </button>
-                )}
               </div>
             </div>
 

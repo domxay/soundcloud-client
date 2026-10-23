@@ -215,6 +215,7 @@ function AppContent() {
       activeLyric: activeLyricInfo.activeLyric,
       nextLyric: activeLyricInfo.nextLyric,
       themeAccent: themeService.getTheme()?.colors?.accent || '#ff5500',
+      volume,
       speed,
     };
 
@@ -226,7 +227,7 @@ function AppContent() {
       bc.postMessage({ type: 'state', payload: overlayState });
       bc.close();
     } catch {}
-  }, [currentTrack, isPlaying, progress, currentTime, duration, activeLyricInfo, speed]);
+  }, [currentTrack, isPlaying, progress, currentTime, duration, activeLyricInfo, volume, speed]);
 
   // Handle incoming commands from Desktop Floating Overlay
   useEffect(() => {
@@ -279,6 +280,18 @@ function AppContent() {
             setSpeed(clamped);
           }
           break;
+        case 'set-volume':
+          if (typeof cmd.payload === 'number') {
+            const clamped = Math.max(0, Math.min(100, Math.round(cmd.payload)));
+            audioService.setVolume(clamped);
+            setVolume(clamped);
+          }
+          break;
+        case 'toggle-mute': {
+          const nextVol = audioService.toggleMute();
+          setVolume(nextVol);
+          break;
+        }
       }
     };
 
