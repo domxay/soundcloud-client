@@ -122,6 +122,7 @@ export interface OverlayState {
   activeLyric?: string;
   nextLyric?: string;
   themeAccent?: string;
+  speed?: number;
 }
 
 export interface ElectronAPI {

@@ -10,6 +10,9 @@ import {
   Music2,
   Sliders,
   GripVertical,
+  Clock,
+  Gauge,
+  RotateCcw,
 } from 'lucide-react';
 import { OverlayState } from '@/types';
 import { useI18n } from '@/services/i18n';
@@ -30,6 +33,7 @@ export default function DesktopOverlay() {
     activeLyric: '',
     nextLyric: '',
     themeAccent: '#ff5500',
+    speed: 1.0,
   });
 
   const [mode, setMode] = useState<'compact' | 'expanded'>(() => {
@@ -44,6 +48,27 @@ export default function DesktopOverlay() {
     const saved = localStorage.getItem('sc_overlay_width');
     return saved ? parseInt(saved, 10) : 560;
   });
+
+  // Shape and Playback Speed Drawer State
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [currentSpeed, setCurrentSpeed] = useState<number>(1.0);
+
+  // PC System Time (Local Clock)
+  const [systemTime, setSystemTime] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSystemTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Sync incoming speed from App state
+  useEffect(() => {
+    if (typeof state.speed === 'number' && state.speed > 0) {
+      setCurrentSpeed(state.speed);
+    }
+  }, [state.speed]);
 
   // Track scrubber state
   const [isScrubbing, setIsScrubbing] = useState(false);
@@ -125,6 +150,11 @@ export default function DesktopOverlay() {
     window.addEventListener('mouseup', handleMouseUp);
   };
 
+  const getTargetHeight = (curMode: 'compact' | 'expanded', openSettings: boolean) => {
+    const baseH = curMode === 'compact' ? 50 : 104;
+    return openSettings ? baseH + 52 : baseH;
+  };
+
   // Edge interactive resize handlers (Left & Right ends)
   const handleEdgeResizeStart = async (e: React.MouseEvent, direction: 'left' | 'right') => {
     e.stopPropagation();
@@ -134,7 +164,7 @@ export default function DesktopOverlay() {
     isResizingRef.current = true;
     const startX = e.screenX;
     const startCardW = cardWidth;
-    const targetH = mode === 'compact' ? 50 : 104;
+    const targetH = getTargetHeight(mode, isSettingsOpen);
 
     // Get current window bounds from Electron
     let startBounds = { x: 0, y: 14, width: startCardW, height: targetH };
@@ -149,7 +179,6 @@ export default function DesktopOverlay() {
       const delta = moveEvent.screenX - startX;
 
       if (direction === 'right') {
-        // Right edge drag: left side stays pinned at startBounds.x, right expands/contracts
         const nextCardW = Math.max(380, Math.min(960, Math.round(startCardW + delta)));
         setCardWidth(nextCardW);
         localStorage.setItem('sc_overlay_width', nextCardW.toString());
@@ -162,7 +191,6 @@ export default function DesktopOverlay() {
           });
         }
       } else {
-        // Left edge drag: right side stays pinned, left expands/contracts
         const nextCardW = Math.max(380, Math.min(960, Math.round(startCardW - delta)));
         const growth = nextCardW - startCardW;
         setCardWidth(nextCardW);
@@ -221,15 +249,15 @@ export default function DesktopOverlay() {
     } catch {}
   }, []);
 
-  // Handle window resizing when mode changes
+  // Handle window resizing when mode or settings drawer state changes
   useEffect(() => {
     localStorage.setItem('sc_overlay_mode', mode);
     localStorage.setItem('sc_overlay_width', cardWidth.toString());
-    const targetH = mode === 'compact' ? 50 : 104;
+    const targetH = getTargetHeight(mode, isSettingsOpen);
     if (window.electronAPI?.resizeOverlay) {
       window.electronAPI.resizeOverlay({ width: cardWidth, height: targetH });
     }
-  }, [mode]);
+  }, [mode, isSettingsOpen, cardWidth]);
 
   useEffect(() => {
     localStorage.setItem('sc_overlay_shape', shapeStyle);
@@ -245,6 +273,13 @@ export default function DesktopOverlay() {
       bc.postMessage({ type: 'action', action, payload });
       bc.close();
     } catch {}
+  };
+
+  const handleSpeedChange = (val: number) => {
+    const rounded = Math.round(val * 100) / 100;
+    const clamped = Math.max(0.5, Math.min(2.0, rounded));
+    setCurrentSpeed(clamped);
+    handleAction('set-speed', clamped);
   };
 
   const handleRestoreApp = () => {
@@ -263,10 +298,6 @@ export default function DesktopOverlay() {
     setMode((prev) => (prev === 'compact' ? 'expanded' : 'compact'));
   };
 
-  const toggleShape = () => {
-    setShapeStyle((prev) => (prev === 'pill' ? 'squircle' : 'pill'));
-  };
-
   const accent = state.themeAccent || '#ff5500';
   const track = state.track;
 
@@ -280,16 +311,33 @@ export default function DesktopOverlay() {
     return `${mins}:${s.toString().padStart(2, '0')}`;
   };
 
+  const pcTimeFormatted = systemTime.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  const pcTimeTooltip = `${systemTime.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })} • ${systemTime.toLocaleDateString()}`;
+
   return (
     <div
       onMouseDown={handleMouseDown}
       className="w-screen h-screen flex items-center justify-center p-0 m-0 select-none bg-transparent overflow-hidden font-sans cursor-grab active:cursor-grabbing"
     >
-      {/* Pristine OLED Floating Card Container (Zero Spreading Box Shadow to Eliminate Square Halo) */}
+      {/* Pristine OLED Floating Card Container */}
       <div
         onMouseDown={handleMouseDown}
-        className={`w-full h-full flex flex-col justify-between overflow-hidden relative border border-zinc-800/80 bg-[#0c0c0e] cursor-grab active:cursor-grabbing shadow-none ${
-          shapeStyle === 'pill' ? 'rounded-full' : 'rounded-2xl'
+        className={`w-full h-full flex flex-col justify-between overflow-hidden relative border border-zinc-800/80 bg-[#0c0c0e] cursor-grab active:cursor-grabbing shadow-none transition-[border-radius] duration-200 ${
+          shapeStyle === 'pill'
+            ? mode === 'compact' && !isSettingsOpen
+              ? 'rounded-full'
+              : 'rounded-3xl'
+            : 'rounded-2xl'
         }`}
       >
         {/* Left Edge Resize Handle (↔ Hover to resize) */}
@@ -416,6 +464,18 @@ export default function DesktopOverlay() {
             </div>
           </div>
 
+          {/* PC System Time Chip (from PC clock) */}
+          <div
+            data-interactive="true"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-900/90 hover:bg-zinc-800/80 border border-zinc-800/80 text-zinc-300 transition-colors select-none shrink-0"
+            title={`${t('systemTime') || 'Время ПК'}: ${pcTimeTooltip}`}
+          >
+            <Clock size={11} className="shrink-0" style={{ color: accent }} />
+            <span className="font-mono text-[11px] font-semibold tracking-tight text-zinc-200">
+              {pcTimeFormatted}
+            </span>
+          </div>
+
           {/* Media Playback Controls */}
           <div
             data-interactive="true"
@@ -451,7 +511,7 @@ export default function DesktopOverlay() {
             </button>
           </div>
 
-          {/* Right Utility Buttons: Lyrics Toggle, Shape Switcher, Restore, Close */}
+          {/* Right Utility Buttons: Lyrics Toggle, Shape & Speed Settings, Restore, Close */}
           <div
             data-interactive="true"
             className="flex items-center gap-1 shrink-0 pl-1 border-l border-zinc-800/80"
@@ -468,12 +528,26 @@ export default function DesktopOverlay() {
               <Mic2 size={13} style={mode === 'expanded' ? { color: accent } : undefined} />
             </button>
 
+            {/* Shape & Speed Settings Trigger Button */}
             <button
-              onClick={toggleShape}
-              className="w-7 h-7 flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
-              title={`${t('overlayShape')}: ${shapeStyle === 'pill' ? 'Pill' : 'Squircle'}`}
+              onClick={() => setIsSettingsOpen((prev) => !prev)}
+              className={`w-7 h-7 flex items-center justify-center rounded-full transition-all relative ${
+                isSettingsOpen
+                  ? 'bg-white/20 text-white ring-1 ring-white/30'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/10'
+              }`}
+              style={isSettingsOpen ? { color: accent } : undefined}
+              title={`${t('overlaySettings') || 'Настройки формы и скорости'}: ${
+                shapeStyle === 'pill' ? 'Pill' : 'Squircle'
+              } • ${currentSpeed.toFixed(2)}x`}
             >
               <Sliders size={12} />
+              {currentSpeed !== 1.0 && (
+                <span
+                  className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-black animate-pulse"
+                  style={{ backgroundColor: accent }}
+                />
+              )}
             </button>
 
             <button
@@ -493,6 +567,131 @@ export default function DesktopOverlay() {
             </button>
           </div>
         </div>
+
+        {/* Interactive Shape & Speed Quick Drawer */}
+        {isSettingsOpen && (
+          <div
+            data-interactive="true"
+            onMouseDown={(e) => e.stopPropagation()}
+            className="px-4 py-2 bg-[#09090b]/98 border-t border-zinc-800/80 flex items-center justify-between gap-3 h-[52px] select-none text-xs backdrop-blur-xl"
+          >
+            {/* Shape Selector Segmented Control */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 mr-0.5">
+                {t('overlayShape') || 'Форма'}
+              </span>
+              <div className="flex items-center p-0.5 rounded-lg bg-zinc-900 border border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setShapeStyle('pill')}
+                  className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all flex items-center gap-1.5 ${
+                    shapeStyle === 'pill'
+                      ? 'bg-zinc-800 text-white shadow-sm font-semibold'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                  style={shapeStyle === 'pill' ? { borderLeft: `2px solid ${accent}` } : undefined}
+                  title={t('overlayShapePill') || 'Капсула'}
+                >
+                  <span className="inline-block w-2.5 h-1.5 rounded-full border border-current" />
+                  <span>Pill</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShapeStyle('squircle')}
+                  className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all flex items-center gap-1.5 ${
+                    shapeStyle === 'squircle'
+                      ? 'bg-zinc-800 text-white shadow-sm font-semibold'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                  style={shapeStyle === 'squircle' ? { borderLeft: `2px solid ${accent}` } : undefined}
+                  title={t('overlayShapeSquircle') || 'Скругленный'}
+                >
+                  <span className="inline-block w-2 h-2 rounded-[3px] border border-current" />
+                  <span>Box</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="h-5 w-[1px] bg-zinc-800/80 shrink-0" />
+
+            {/* Playback Speed Controller Slider & Presets */}
+            <div className="flex-1 min-w-0 flex items-center gap-2.5">
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Gauge size={13} style={{ color: accent }} />
+                <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 hidden sm:inline">
+                  {t('overlaySpeed') || 'Скорость'}
+                </span>
+                <span
+                  className="font-mono text-xs font-bold px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 min-w-[44px] text-center"
+                  style={{ color: currentSpeed !== 1.0 ? accent : '#e4e4e7' }}
+                  title={t('overlaySpeed')}
+                >
+                  {currentSpeed.toFixed(2)}x
+                </span>
+              </div>
+
+              {/* Smooth Range Slider */}
+              <div className="flex-1 min-w-[80px] flex items-center relative group/speed">
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2.0"
+                  step="0.05"
+                  value={currentSpeed}
+                  onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
+                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer focus:outline-none"
+                  style={{
+                    accentColor: accent,
+                  }}
+                />
+              </div>
+
+              {/* Quick Preset Buttons */}
+              <div className="flex items-center gap-1 shrink-0">
+                {[0.8, 1.0, 1.25, 1.5].map((preset) => {
+                  const isActive = Math.abs(currentSpeed - preset) < 0.02;
+                  return (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => handleSpeedChange(preset)}
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
+                        isActive
+                          ? 'bg-zinc-800 text-white font-bold border border-zinc-700'
+                          : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'
+                      }`}
+                      style={isActive ? { color: preset !== 1.0 ? accent : '#fff' } : undefined}
+                    >
+                      {preset === 1.0 ? '1x' : `${preset}x`}
+                    </button>
+                  );
+                })}
+
+                {/* Reset to 1.0x if altered */}
+                {currentSpeed !== 1.0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleSpeedChange(1.0)}
+                    className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                    title={t('speedNormal') || 'Сброс на 1.0x'}
+                  >
+                    <RotateCcw size={11} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Close Drawer Button */}
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(false)}
+              className="w-5 h-5 flex items-center justify-center rounded-full text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors shrink-0"
+              title="Закрыть настройки"
+            >
+              <X size={11} />
+            </button>
+          </div>
+        )}
 
         {/* Lower Expanded Row: Real-time Synchronized Lyrics */}
         {mode === 'expanded' && (
