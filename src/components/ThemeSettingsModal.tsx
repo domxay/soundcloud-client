@@ -44,8 +44,9 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
 
   const filteredWallpapers = useMemo(() => {
     return ALL_WALLPAPERS.filter((w) => {
-      if (wallpaperFilter === 'live' && w.type !== 'video') return false;
-      if (wallpaperFilter === 'static' && w.type !== 'image') return false;
+      const isLive = w.type === 'video' || /\.(gif|mp4|webm)(\?.*)?$/i.test(w.url);
+      if (wallpaperFilter === 'live' && !isLive) return false;
+      if (wallpaperFilter === 'static' && isLive) return false;
       if (wallpaperGenre !== 'All' && w.category !== wallpaperGenre) return false;
       if (wallpaperSearch.trim()) {
         const q = wallpaperSearch.toLowerCase();
@@ -663,11 +664,14 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                     {filteredWallpapers.map((w) => {
                       const isSelected = bgConfig.url === w.url;
                       const isHovered = hoveredVideoId === w.id;
+                      const isVideo = w.type === 'video' || /\.(mp4|webm)(\?.*)?$/i.test(w.url);
+                      const isGif = /\.(gif)(\?.*)?$/i.test(w.url);
+                      const isLive = isVideo || isGif;
 
                       return (
                         <div
                           key={w.id}
-                          onClick={() => handleApplyBackground({ ...bgConfig, type: w.type, url: w.url })}
+                          onClick={() => handleApplyBackground({ ...bgConfig, type: isVideo ? 'video' : 'image', url: w.url })}
                           onMouseEnter={() => setHoveredVideoId(w.id)}
                           onMouseLeave={() => setHoveredVideoId(null)}
                           className={`group cursor-pointer rounded-sc border overflow-hidden relative aspect-video transition-all hover:scale-[1.02] shadow-md ${
@@ -677,12 +681,12 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                           }`}
                         >
                           <img
-                            src={w.thumbnail}
+                            src={isGif && isHovered ? w.url : w.thumbnail}
                             alt={w.name}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             loading="lazy"
                           />
-                          {w.type === 'video' && isHovered && (
+                          {isVideo && isHovered && (
                             <video
                               src={w.url}
                               autoPlay
@@ -697,12 +701,12 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                           <div className="absolute top-1.5 left-1.5 right-1.5 flex items-center justify-between pointer-events-none">
                             <span
                               className={`px-1.5 py-0.5 text-[9px] font-extrabold rounded uppercase tracking-wider ${
-                                w.type === 'video'
+                                isLive
                                   ? 'bg-emerald-500/90 text-white shadow-sm'
                                   : 'bg-black/70 text-zinc-300 border border-white/10'
                               }`}
                             >
-                              {w.type === 'video' ? 'LIVE' : '4K'}
+                              {isVideo ? 'MP4 LIVE' : isGif ? 'GIF LIVE' : '4K'}
                             </span>
 
                             {isSelected && (
@@ -870,16 +874,23 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[340px] overflow-y-auto pr-1">
                       {pinterestResults.map((item) => {
                         const isSelected = bgConfig.url === item.url;
+                        const isHovered = hoveredVideoId === item.id;
+                        const isVideo = item.type === 'video' || /\.(mp4|webm)(\?.*)?$/i.test(item.url);
+                        const isGif = /\.(gif)(\?.*)?$/i.test(item.url);
+                        const isLive = isVideo || isGif;
+
                         return (
                           <div
                             key={item.id}
                             onClick={() =>
                               handleApplyBackground({
                                 ...bgConfig,
-                                type: item.type,
+                                type: isVideo ? 'video' : 'image',
                                 url: item.url,
                               })
                             }
+                            onMouseEnter={() => setHoveredVideoId(item.id)}
+                            onMouseLeave={() => setHoveredVideoId(null)}
                             className={`group cursor-pointer rounded-sc border overflow-hidden relative aspect-video transition-all hover:scale-[1.02] shadow-md ${
                               isSelected
                                 ? 'border-[#E60023] ring-2 ring-[#E60023] shadow-[#E60023]/25'
@@ -887,16 +898,32 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                             }`}
                           >
                             <img
-                              src={item.thumbnail || item.url}
+                              src={isGif && isHovered ? item.url : (item.thumbnail || item.url)}
                               alt={item.title}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                               loading="lazy"
                             />
+                            {isVideo && isHovered && (
+                              <video
+                                src={item.url}
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                className="absolute inset-0 w-full h-full object-cover z-0"
+                              />
+                            )}
 
                             {/* Top Badge */}
                             <div className="absolute top-1.5 left-1.5 right-1.5 flex items-center justify-between pointer-events-none">
-                              <span className="px-1.5 py-0.5 text-[9px] font-extrabold rounded uppercase tracking-wider bg-black/70 text-zinc-300 border border-white/10">
-                                {item.type === 'video' ? 'VIDEO' : item.width ? `${item.width}x${item.height}` : 'HD'}
+                              <span
+                                className={`px-1.5 py-0.5 text-[9px] font-extrabold rounded uppercase tracking-wider ${
+                                  isLive
+                                    ? 'bg-emerald-500/90 text-white shadow-sm'
+                                    : 'bg-black/70 text-zinc-300 border border-white/10'
+                                }`}
+                              >
+                                {isVideo ? 'MP4 LIVE' : isGif ? 'GIF LIVE' : item.width ? `${item.width}x${item.height}` : '4K'}
                               </span>
 
                               {isSelected && (

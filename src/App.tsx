@@ -599,6 +599,10 @@ function AppContent() {
     return raw;
   }, [customBg.url]);
 
+  const isBgVideo = useMemo(() => {
+    return customBg.type === 'video' || /\.(mp4|webm|m4v|mov)(\?.*)?$/i.test(customBg.url || '');
+  }, [customBg.type, customBg.url]);
+
   return (
     <div
       className={`min-h-screen ${
@@ -607,7 +611,7 @@ function AppContent() {
     >
       {customBg.type !== 'none' && resolvedBgSrc && (
         <div className="sc-bg-layer">
-          {customBg.type === 'video' ? (
+          {isBgVideo ? (
             <video
               key={resolvedBgSrc}
               src={resolvedBgSrc}

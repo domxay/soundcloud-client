@@ -52,16 +52,19 @@ export class PinterestService {
 
     // Direct fetch fallback (works in Electron due to webSecurity: false)
     try {
-      const fullQuery = `site:pinterest.com ${cleanQuery} ${animated ? 'aesthetic gif loop' : 'aesthetic wallpaper 4k'}`;
+      const fullQuery = animated
+        ? `site:pinterest.com ${cleanQuery} gif loop`
+        : `site:pinterest.com ${cleanQuery} wallpaper 4k`;
       const searchUrl = `https://duckduckgo.com/?q=${encodeURIComponent(fullQuery)}&iax=images&ia=images`;
 
       const tokenRes = await fetch(searchUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
       });
       const html = await tokenRes.text();
-      const match = html.match(/vqd=([0-9-]+)/);
+      const match = html.match(/vqd=["']?([0-9-]+)["']?/i) || html.match(/vqd=([0-9-]+)/i);
       if (!match) return [];
 
       const vqd = match[1];
@@ -70,7 +73,7 @@ export class PinterestService {
 
       const res = await fetch(apiReq, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         },
       });
 
@@ -78,21 +81,29 @@ export class PinterestService {
       const items: any[] = data.results || [];
 
       return items
-        .filter((item) => item.image && (item.image.includes('pinimg.com') || item.image.startsWith('http')))
+        .filter((item) => item.image && item.image.startsWith('http') && !item.image.includes('d53b014d86a6b6761bf649a0ed813c2b'))
         .map((item, index) => {
-          const isGif = item.image.toLowerCase().endsWith('.gif') || animated;
-          const isVideo = item.image.toLowerCase().endsWith('.mp4') || item.image.toLowerCase().endsWith('.webm');
-          const type: 'image' | 'video' = isVideo ? 'video' : 'image';
+          let fullUrl = item.image;
+          if (fullUrl.includes('pinimg.com')) {
+            fullUrl = fullUrl.replace(/\/(?:236x|474x|564x|736x|1200x)\//, '/originals/');
+          }
+
+          let thumbUrl = item.thumbnail || item.image;
+          if (thumbUrl.includes('pinimg.com/originals/')) {
+            thumbUrl = thumbUrl.replace('/originals/', '/474x/');
+          }
+
+          const isVideo = /\.(mp4|webm)$/i.test(fullUrl);
 
           return {
             id: `pin-${Date.now()}-${index}`,
             title: item.title?.replace(/\|.*|Etsy.*|-.*|Pinterest/gi, '').trim() || 'Pinterest Aesthetic',
-            url: item.image,
-            thumbnail: item.thumbnail || item.image,
+            url: fullUrl,
+            thumbnail: thumbUrl,
             width: item.width,
             height: item.height,
             source: item.url,
-            type,
+            type: isVideo ? 'video' : 'image',
           };
         });
     } catch (error) {
@@ -111,8 +122,9 @@ export class PinterestService {
 
     // If it's already a direct raw image/video URL
     if (/\.(jpg|jpeg|png|webp|gif|mp4|webm)(\?.*)?$/i.test(trimmed)) {
-      const isVideo = /\.(mp4|webm)(\?.*)?$/i.test(trimmed);
-      return { success: true, url: trimmed, type: isVideo ? 'video' : 'image' };
+      const origUrl = trimmed.replace(/\/(?:236x|474x|564x|736x|1200x)\//, '/originals/');
+      const isVideo = /\.(mp4|webm)(\?.*)?$/i.test(origUrl);
+      return { success: true, url: origUrl, type: isVideo ? 'video' : 'image' };
     }
 
     if (window.electronAPI?.resolvePinterestUrl) {
@@ -127,42 +139,54 @@ export class PinterestService {
     try {
       const res = await fetch(trimmed, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
         redirect: 'follow',
       });
       const html = await res.text();
 
-      // Priority 1: Original full-res Pinterest pinimg
-      const origMatch = html.match(/https:\/\/i\.pinimg\.com\/originals\/[a-zA-Z0-9\/._-]+/);
-      if (origMatch) {
-        const imgUrl = origMatch[0];
-        const isGif = imgUrl.toLowerCase().endsWith('.gif');
-        return { success: true, url: imgUrl, type: 'image' };
+      // Priority 1: Video (MP4) from v1.pinimg.com or og:video
+      const mp4Matches = [...html.matchAll(/https:\/\/(?:v1\.pinimg\.com|v\.pinimg\.com)[^"'<>\s]+\.mp4/g)].map((m) => m[0]);
+      if (mp4Matches.length > 0) {
+        const bestVideo = mp4Matches.find((v) => v.includes('720p') || v.includes('1080p')) || mp4Matches[0];
+        return { success: true, url: bestVideo, type: 'video' };
       }
 
-      // Priority 2: Pinterest Video (mp4)
-      const videoMatch = html.match(/<meta property="og:video" content="([^"]+)"/) ||
-        html.match(/https:\/\/v\.pinimg\.com\/videos\/[a-zA-Z0-9\/._-]+\.mp4/);
-      if (videoMatch) {
-        return { success: true, url: videoMatch[1] || videoMatch[0], type: 'video' };
+      const ogVideo = html.match(/<meta property="og:video" content="([^"]+)"/);
+      if (ogVideo) {
+        return { success: true, url: ogVideo[1], type: 'video' };
       }
 
-      // Priority 3: 736x or 1200x high-res
-      const highResMatch = html.match(/https:\/\/i\.pinimg\.com\/(?:736x|1200x)\/[a-zA-Z0-9\/._-]+/);
-      if (highResMatch) {
-        return { success: true, url: highResMatch[0], type: 'image' };
+      // Priority 2: Original full-res Pinterest pinimg (exclude site logo d53b014d86a6b6761bf649a0ed813c2b)
+      const allOriginals = [...html.matchAll(/https:\/\/i\.pinimg\.com\/originals\/[a-zA-Z0-9\/._-]+\.(?:jpg|png|webp|gif)/g)]
+        .map((m) => m[0])
+        .filter((u) => !u.includes('d53b014d86a6b6761bf649a0ed813c2b'));
+
+      if (allOriginals.length > 0) {
+        return { success: true, url: allOriginals[0], type: 'image' };
       }
 
-      // Priority 4: Standard og:image
+      // Priority 3: 736x or other sizes upgraded to originals
+      const resMatches = [...html.matchAll(/https:\/\/i\.pinimg\.com\/(?:736x|1200x|564x|474x)\/[a-zA-Z0-9\/._-]+\.(?:jpg|png|webp|gif)/g)]
+        .map((m) => m[0])
+        .filter((u) => !u.includes('d53b014d86a6b6761bf649a0ed813c2b'));
+
+      if (resMatches.length > 0) {
+        const upgraded = resMatches[0].replace(/\/(?:736x|1200x|564x|474x)\//, '/originals/');
+        return { success: true, url: upgraded, type: 'image' };
+      }
+
+      // Priority 4: og:image upgraded
       const ogMatch = html.match(/<meta property="og:image" content="([^"]+)"/);
-      if (ogMatch) {
-        return { success: true, url: ogMatch[1], type: 'image' };
+      if (ogMatch && !ogMatch[1].includes('d53b014d86a6b6761bf649a0ed813c2b')) {
+        const upgraded = ogMatch[1].replace(/\/(?:736x|1200x|564x|474x)\//, '/originals/');
+        return { success: true, url: upgraded, type: 'image' };
       }
 
-      return { success: false, error: 'Could not extract image from Pinterest link' };
+      return { success: false, error: 'Не удалось извлечь оригинальный медиафайл из ссылки Pinterest' };
     } catch (err: any) {
-      return { success: false, error: err.message || 'Failed to fetch Pinterest link' };
+      return { success: false, error: err.message || 'Resolve failed' };
     }
   }
 }
