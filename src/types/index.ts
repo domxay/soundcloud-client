@@ -161,6 +161,8 @@ export interface ElectronAPI {
   moveOverlay?: (deltaX: number, deltaY: number) => void;
   restoreMainWindow: () => Promise<void>;
   toggleOverlay: (show?: boolean) => Promise<boolean>;
+  searchPinterest?: (query: string, animated?: boolean) => Promise<any[]>;
+  resolvePinterestUrl?: (url: string) => Promise<{ success: boolean; url?: string; type?: 'image' | 'video'; error?: string }>;
 }
 
 declare global {

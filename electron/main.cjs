@@ -658,6 +658,98 @@ ipcMain.handle('sc:toggle-overlay', (event, explicitShow) => {
   }
 });
 
+// Pinterest Wallpaper Search & URL Resolver
+ipcMain.handle('sc:search-pinterest', async (event, query, animated) => {
+  try {
+    const cleanQuery = (query || 'dark aesthetic').trim();
+    const fullQuery = `site:pinterest.com ${cleanQuery} ${animated ? 'aesthetic gif loop' : 'aesthetic wallpaper 4k'}`;
+    const tokenRes = await fetch(`https://duckduckgo.com/?q=${encodeURIComponent(fullQuery)}&iax=images&ia=images`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+    });
+    const html = await tokenRes.text();
+    const match = html.match(/vqd=([0-9-]+)/);
+    if (!match) return [];
+
+    const vqd = match[1];
+    const filterParam = animated ? '&f=type:gif' : '';
+    const apiReq = `https://duckduckgo.com/i.js?l=us-en&o=json&q=${encodeURIComponent(fullQuery)}&vqd=${vqd}${filterParam}`;
+
+    const res = await fetch(apiReq, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+    });
+    const data = await res.json();
+    const items = data.results || [];
+
+    return items
+      .filter((item) => item.image && item.image.startsWith('http'))
+      .map((item, index) => {
+        const isVideo = item.image.toLowerCase().endsWith('.mp4') || item.image.toLowerCase().endsWith('.webm');
+        return {
+          id: `pin-${Date.now()}-${index}`,
+          title: (item.title || 'Pinterest Aesthetic').replace(/\|.*|Etsy.*|-.*|Pinterest/gi, '').trim(),
+          url: item.image,
+          thumbnail: item.thumbnail || item.image,
+          width: item.width,
+          height: item.height,
+          source: item.url,
+          type: isVideo ? 'video' : 'image',
+        };
+      });
+  } catch (err) {
+    console.error('Electron Pinterest search error:', err);
+    return [];
+  }
+});
+
+ipcMain.handle('sc:resolve-pinterest-url', async (event, pinUrl) => {
+  try {
+    const trimmed = (pinUrl || '').trim();
+    if (!trimmed) return { success: false, error: 'Empty URL' };
+
+    if (/\.(jpg|jpeg|png|webp|gif|mp4|webm)(\?.*)?$/i.test(trimmed)) {
+      const isVideo = /\.(mp4|webm)(\?.*)?$/i.test(trimmed);
+      return { success: true, url: trimmed, type: isVideo ? 'video' : 'image' };
+    }
+
+    const res = await fetch(trimmed, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+      redirect: 'follow',
+    });
+    const html = await res.text();
+
+    const origMatch = html.match(/https:\/\/i\.pinimg\.com\/originals\/[a-zA-Z0-9\/._-]+/);
+    if (origMatch) {
+      return { success: true, url: origMatch[0], type: 'image' };
+    }
+
+    const videoMatch = html.match(/<meta property="og:video" content="([^"]+)"/) ||
+      html.match(/https:\/\/v\.pinimg\.com\/videos\/[a-zA-Z0-9\/._-]+\.mp4/);
+    if (videoMatch) {
+      return { success: true, url: videoMatch[1] || videoMatch[0], type: 'video' };
+    }
+
+    const highResMatch = html.match(/https:\/\/i\.pinimg\.com\/(?:736x|1200x)\/[a-zA-Z0-9\/._-]+/);
+    if (highResMatch) {
+      return { success: true, url: highResMatch[0], type: 'image' };
+    }
+
+    const ogMatch = html.match(/<meta property="og:image" content="([^"]+)"/);
+    if (ogMatch) {
+      return { success: true, url: ogMatch[1], type: 'image' };
+    }
+
+    return { success: false, error: 'Could not extract media from Pinterest URL' };
+  } catch (err) {
+    return { success: false, error: err.message || 'Resolve failed' };
+  }
+});
+
 ipcMain.handle('sc:window-minimize', () => {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.minimize();
 });

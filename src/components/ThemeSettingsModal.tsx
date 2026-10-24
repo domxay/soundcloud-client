@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { themeService, THEME_PRESETS, BACKGROUND_PRESETS, CustomBackground } from '@/services/theme';
 import { ALL_WALLPAPERS, WallpaperItem } from '@/data/wallpapers';
-import { X, Palette, Image as ImageIcon, Video, Check, Upload, Sliders, Sparkles, Shield, Globe, CheckCircle2, RefreshCw, Search, Film, Languages } from 'lucide-react';
+import { pinterestService, PinterestWallpaperItem, AESTHETIC_SEARCH_TAGS } from '@/services/pinterest';
+import { X, Palette, Image as ImageIcon, Video, Check, Upload, Sliders, Sparkles, Shield, Globe, CheckCircle2, RefreshCw, Search, Film, Languages, Compass, Link2, ExternalLink, Loader2 } from 'lucide-react';
 import { useI18n } from '@/services/i18n';
 
 interface ThemeSettingsModalProps {
@@ -29,6 +30,17 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
   const [wallpaperGenre, setWallpaperGenre] = useState<string>('All');
   const [wallpaperSearch, setWallpaperSearch] = useState('');
   const [hoveredVideoId, setHoveredVideoId] = useState<string | null>(null);
+
+  // Pinterest Tab & Search State
+  const [bgSubTab, setBgSubTab] = useState<'curated' | 'pinterest'>('curated');
+  const [pinterestQuery, setPinterestQuery] = useState('');
+  const [pinterestAnimated, setPinterestAnimated] = useState(false);
+  const [pinterestResults, setPinterestResults] = useState<PinterestWallpaperItem[]>([]);
+  const [pinterestLoading, setPinterestLoading] = useState(false);
+  const [pinterestError, setPinterestError] = useState<string | null>(null);
+  const [pinLinkInput, setPinLinkInput] = useState('');
+  const [pinLinkResolving, setPinLinkResolving] = useState(false);
+  const [pinLinkStatus, setPinLinkStatus] = useState<{ success: boolean; msg: string } | null>(null);
 
   const filteredWallpapers = useMemo(() => {
     return ALL_WALLPAPERS.filter((w) => {
@@ -185,6 +197,65 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
     };
     setCustomUrl('');
     handleApplyBackground(cleared);
+  };
+
+  const handleSearchPinterest = async (forcedQuery?: string, forcedAnimated?: boolean) => {
+    const query = (forcedQuery !== undefined ? forcedQuery : pinterestQuery).trim();
+    const isAnim = forcedAnimated !== undefined ? forcedAnimated : pinterestAnimated;
+    if (!query) return;
+    
+    setPinterestLoading(true);
+    setPinterestError(null);
+    try {
+      const results = await pinterestService.search(query, isAnim);
+      setPinterestResults(results);
+      if (results.length === 0) {
+        setPinterestError('Ничего не найдено по данному запросу. Попробуйте другой тег.');
+      }
+    } catch (err: any) {
+      setPinterestError(err.message || 'Ошибка поиска в Pinterest');
+    } finally {
+      setPinterestLoading(false);
+    }
+  };
+
+  const handleResolvePinUrl = async () => {
+    const raw = pinLinkInput.trim();
+    if (!raw) return;
+
+    setPinLinkResolving(true);
+    setPinLinkStatus(null);
+    try {
+      const res = await pinterestService.resolveUrl(raw);
+      if (res.success && res.url) {
+        const isVideo = res.type === 'video';
+        const updated: CustomBackground = {
+          ...bgConfig,
+          type: isVideo ? 'video' : 'image',
+          url: res.url,
+        };
+        setCustomUrl(res.url);
+        handleApplyBackground(updated);
+        setPinLinkStatus({
+          success: true,
+          msg: isVideo ? 'Оригинал видео (MP4) успешно применен как живой фон!' : 'Оригинал высокого разрешения (4K) установлен как фон!',
+        });
+        setPinLinkInput('');
+      } else {
+        setPinLinkStatus({
+          success: false,
+          msg: res.error || 'Не удалось извлечь оригинальный файл из ссылки Pinterest.',
+        });
+      }
+    } catch (err: any) {
+      setPinLinkStatus({
+        success: false,
+        msg: err.message || 'Сбой обработки ссылки Pinterest.',
+      });
+    } finally {
+      setPinLinkResolving(false);
+      setTimeout(() => setPinLinkStatus(null), 5000);
+    }
   };
 
   const handleApplyProxy = async (proxyRule: string) => {
@@ -474,153 +545,390 @@ export default function ThemeSettingsModal({ isOpen, onClose }: ThemeSettingsMod
                 </div>
               )}
 
-              {/* Curated Wallpaper Library (100 Wallpapers) */}
-              <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-white uppercase tracking-wider">
-                      Wallpaper Library (100 Curated Themes)
-                    </label>
-                    <p className="text-[11px] text-sc-text-secondary mt-0.5">
-                      50 live looped videos &bull; 50 ultra-HD static backgrounds
-                    </p>
-                  </div>
+              {/* Sub-tab Navigation: Curated 100 Wallpapers vs Pinterest Search */}
+              <div className="flex items-center gap-2 border-b border-sc-border pb-3">
+                <button
+                  onClick={() => setBgSubTab('curated')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-sc transition-all flex items-center gap-2 ${
+                    bgSubTab === 'curated'
+                      ? 'bg-sc-accent text-white shadow-md shadow-sc-accent/20'
+                      : 'bg-[#181818] border border-sc-border text-sc-text-secondary hover:text-white hover:border-sc-accent/40'
+                  }`}
+                >
+                  <Sparkles size={14} />
+                  <span>{t('pinterestCuratedLibrary')}</span>
+                </button>
 
-                  {/* Filter Mode: All / Live / Static */}
-                  <div className="flex items-center gap-1 bg-[#1a1a1a] p-1 rounded-sc border border-sc-border self-start sm:self-auto">
-                    <button
-                      onClick={() => setWallpaperFilter('all')}
-                      className={`px-2.5 py-1 text-[11px] font-semibold rounded-sc transition-colors ${
-                        wallpaperFilter === 'all'
-                          ? 'bg-sc-accent text-white shadow-sm'
-                          : 'text-sc-text-secondary hover:text-white'
-                      }`}
-                    >
-                      All (100)
-                    </button>
-                    <button
-                      onClick={() => setWallpaperFilter('live')}
-                      className={`px-2.5 py-1 text-[11px] font-semibold rounded-sc transition-colors flex items-center gap-1 ${
-                        wallpaperFilter === 'live'
-                          ? 'bg-sc-accent text-white shadow-sm'
-                          : 'text-sc-text-secondary hover:text-white'
-                      }`}
-                    >
-                      <Film size={11} />
-                      Live (50)
-                    </button>
-                    <button
-                      onClick={() => setWallpaperFilter('static')}
-                      className={`px-2.5 py-1 text-[11px] font-semibold rounded-sc transition-colors flex items-center gap-1 ${
-                        wallpaperFilter === 'static'
-                          ? 'bg-sc-accent text-white shadow-sm'
-                          : 'text-sc-text-secondary hover:text-white'
-                      }`}
-                    >
-                      <ImageIcon size={11} />
-                      Static (50)
-                    </button>
-                  </div>
-                </div>
+                <button
+                  onClick={() => {
+                    setBgSubTab('pinterest');
+                    if (pinterestResults.length === 0) {
+                      handleSearchPinterest('Dark Aesthetic 4k wallpaper');
+                    }
+                  }}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-sc transition-all flex items-center gap-2 ${
+                    bgSubTab === 'pinterest'
+                      ? 'bg-[#E60023] text-white shadow-md shadow-[#E60023]/25'
+                      : 'bg-[#181818] border border-sc-border text-sc-text-secondary hover:text-white hover:border-[#E60023]/50'
+                  }`}
+                >
+                  <Compass size={14} />
+                  <span>{t('pinterestBrowse')}</span>
+                  <span className="text-[9px] uppercase px-1 py-0.2 bg-white/20 rounded font-black">Live API</span>
+                </button>
+              </div>
 
-                {/* Search & Genre tags */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  <div className="relative flex-1">
-                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sc-text-secondary" />
-                    <input
-                      type="text"
-                      value={wallpaperSearch}
-                      onChange={(e) => setWallpaperSearch(e.target.value)}
-                      placeholder="Search wallpapers by title, genre, artist..."
-                      className="w-full rounded-sc border border-sc-border bg-[#161616] py-1.5 pl-8 pr-3 text-xs text-white placeholder:text-sc-text-secondary/60 focus:border-sc-accent focus:outline-none"
-                    />
-                  </div>
+              {bgSubTab === 'curated' ? (
+                /* Curated Wallpaper Library (100 Wallpapers) */
+                <div className="space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-white uppercase tracking-wider">
+                        Wallpaper Library (100 Curated Themes)
+                      </label>
+                      <p className="text-[11px] text-sc-text-secondary mt-0.5">
+                        50 live looped videos &bull; 50 ultra-HD static backgrounds
+                      </p>
+                    </div>
 
-                  <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
-                    {['All', 'Cyberpunk', 'Anime & Lo-Fi', 'Synthwave', 'Dark & Minimal', 'Cosmic & Space', 'Nature'].map((g) => (
+                    {/* Filter Mode: All / Live / Static */}
+                    <div className="flex items-center gap-1 bg-[#1a1a1a] p-1 rounded-sc border border-sc-border self-start sm:self-auto">
                       <button
-                        key={g}
-                        onClick={() => setWallpaperGenre(g)}
-                        className={`px-2.5 py-1 text-[10px] font-bold rounded-sc whitespace-nowrap transition-colors ${
-                          wallpaperGenre === g
-                            ? 'bg-sc-accent text-white'
-                            : 'bg-[#181818] border border-sc-border text-sc-text-secondary hover:text-white hover:border-sc-accent/50'
+                        onClick={() => setWallpaperFilter('all')}
+                        className={`px-2.5 py-1 text-[11px] font-semibold rounded-sc transition-colors ${
+                          wallpaperFilter === 'all'
+                            ? 'bg-sc-accent text-white shadow-sm'
+                            : 'text-sc-text-secondary hover:text-white'
                         }`}
                       >
-                        {g}
+                        All (100)
                       </button>
-                    ))}
+                      <button
+                        onClick={() => setWallpaperFilter('live')}
+                        className={`px-2.5 py-1 text-[11px] font-semibold rounded-sc transition-colors flex items-center gap-1 ${
+                          wallpaperFilter === 'live'
+                            ? 'bg-sc-accent text-white shadow-sm'
+                            : 'text-sc-text-secondary hover:text-white'
+                        }`}
+                      >
+                        <Film size={11} />
+                        Live (50)
+                      </button>
+                      <button
+                        onClick={() => setWallpaperFilter('static')}
+                        className={`px-2.5 py-1 text-[11px] font-semibold rounded-sc transition-colors flex items-center gap-1 ${
+                          wallpaperFilter === 'static'
+                            ? 'bg-sc-accent text-white shadow-sm'
+                            : 'text-sc-text-secondary hover:text-white'
+                        }`}
+                      >
+                        <ImageIcon size={11} />
+                        Static (50)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Search & Genre tags */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sc-text-secondary" />
+                      <input
+                        type="text"
+                        value={wallpaperSearch}
+                        onChange={(e) => setWallpaperSearch(e.target.value)}
+                        placeholder="Search wallpapers by title, genre, artist..."
+                        className="w-full rounded-sc border border-sc-border bg-[#161616] py-1.5 pl-8 pr-3 text-xs text-white placeholder:text-sc-text-secondary/60 focus:border-sc-accent focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
+                      {['All', 'Cyberpunk', 'Anime & Lo-Fi', 'Synthwave', 'Dark & Minimal', 'Cosmic & Space', 'Nature'].map((g) => (
+                        <button
+                          key={g}
+                          onClick={() => setWallpaperGenre(g)}
+                          className={`px-2.5 py-1 text-[10px] font-bold rounded-sc whitespace-nowrap transition-colors ${
+                            wallpaperGenre === g
+                              ? 'bg-sc-accent text-white'
+                              : 'bg-[#181818] border border-sc-border text-sc-text-secondary hover:text-white hover:border-sc-accent/50'
+                          }`}
+                        >
+                          {g}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Wallpapers Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[360px] overflow-y-auto pr-1">
+                    {filteredWallpapers.map((w) => {
+                      const isSelected = bgConfig.url === w.url;
+                      const isHovered = hoveredVideoId === w.id;
+
+                      return (
+                        <div
+                          key={w.id}
+                          onClick={() => handleApplyBackground({ ...bgConfig, type: w.type, url: w.url })}
+                          onMouseEnter={() => setHoveredVideoId(w.id)}
+                          onMouseLeave={() => setHoveredVideoId(null)}
+                          className={`group cursor-pointer rounded-sc border overflow-hidden relative aspect-video transition-all hover:scale-[1.02] shadow-md ${
+                            isSelected
+                              ? 'border-sc-accent ring-2 ring-sc-accent shadow-sc-accent/25'
+                              : 'border-sc-border hover:border-sc-accent/60'
+                          }`}
+                        >
+                          <img
+                            src={w.thumbnail}
+                            alt={w.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
+                          />
+                          {w.type === 'video' && isHovered && (
+                            <video
+                              src={w.url}
+                              autoPlay
+                              loop
+                              muted
+                              playsInline
+                              className="absolute inset-0 w-full h-full object-cover z-0"
+                            />
+                          )}
+
+                          {/* Top Badges */}
+                          <div className="absolute top-1.5 left-1.5 right-1.5 flex items-center justify-between pointer-events-none">
+                            <span
+                              className={`px-1.5 py-0.5 text-[9px] font-extrabold rounded uppercase tracking-wider ${
+                                w.type === 'video'
+                                  ? 'bg-emerald-500/90 text-white shadow-sm'
+                                  : 'bg-black/70 text-zinc-300 border border-white/10'
+                              }`}
+                            >
+                              {w.type === 'video' ? 'LIVE' : '4K'}
+                            </span>
+
+                            {isSelected && (
+                              <span className="h-5 w-5 rounded-full bg-sc-accent text-white flex items-center justify-center shadow-md">
+                                <Check size={12} />
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Bottom Overlay Title */}
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-2 flex flex-col justify-end pointer-events-none">
+                            <span className="text-[11px] font-bold text-white leading-tight truncate">
+                              {w.name}
+                            </span>
+                            <span className="text-[9px] text-sc-text-secondary/90 truncate mt-0.5">
+                              {w.category} &bull; {w.author || 'Pinterest'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
+              ) : (
+                /* Pinterest Search & Instant Link Resolver */
+                <div className="space-y-4">
+                  {/* Pin Link Direct Import Card */}
+                  <div className="rounded-sc border border-[#E60023]/30 bg-[#E60023]/5 p-3.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Link2 size={15} className="text-[#E60023]" />
+                        <span className="text-xs font-bold text-white">Прямой импорт пина с Pinterest</span>
+                      </div>
+                      <span className="text-[10px] text-sc-text-secondary">pin.it / pinterest.com/pin/...</span>
+                    </div>
 
-                {/* Wallpapers Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[360px] overflow-y-auto pr-1">
-                  {filteredWallpapers.map((w) => {
-                    const isSelected = bgConfig.url === w.url;
-                    const isHovered = hoveredVideoId === w.id;
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={pinLinkInput}
+                        onChange={(e) => setPinLinkInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleResolvePinUrl();
+                        }}
+                        placeholder="Вставьте ссылку на пин, например: https://pin.it/3xY8abc или https://pinterest.com/pin/..."
+                        className="flex-1 rounded-sc border border-sc-border bg-[#161616] px-3 py-1.5 text-xs text-white placeholder:text-sc-text-secondary/60 focus:border-[#E60023] focus:outline-none"
+                      />
+                      <button
+                        onClick={handleResolvePinUrl}
+                        disabled={pinLinkResolving || !pinLinkInput.trim()}
+                        className="px-3.5 py-1.5 rounded-sc bg-[#E60023] hover:bg-[#ad081b] text-white text-xs font-bold transition-colors flex items-center gap-1.5 disabled:opacity-50 shrink-0 shadow-md shadow-[#E60023]/20"
+                      >
+                        {pinLinkResolving ? (
+                          <>
+                            <Loader2 size={13} className="animate-spin" />
+                            <span>{t('pinterestResolving')}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={13} />
+                            <span>{t('pinterestResolveAndApply')}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
 
-                    return (
+                    {pinLinkStatus && (
                       <div
-                        key={w.id}
-                        onClick={() => handleApplyBackground({ ...bgConfig, type: w.type, url: w.url })}
-                        onMouseEnter={() => setHoveredVideoId(w.id)}
-                        onMouseLeave={() => setHoveredVideoId(null)}
-                        className={`group cursor-pointer rounded-sc border overflow-hidden relative aspect-video transition-all hover:scale-[1.02] shadow-md ${
-                          isSelected
-                            ? 'border-sc-accent ring-2 ring-sc-accent shadow-sc-accent/25'
-                            : 'border-sc-border hover:border-sc-accent/60'
+                        className={`text-[11px] p-2 rounded-sc flex items-center gap-2 ${
+                          pinLinkStatus.success
+                            ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300'
+                            : 'bg-red-500/15 border border-red-500/30 text-red-300'
                         }`}
                       >
-                        <img
-                          src={w.thumbnail}
-                          alt={w.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          loading="lazy"
-                        />
-                        {w.type === 'video' && isHovered && (
-                          <video
-                            src={w.url}
-                            autoPlay
-                            loop
-                            muted
-                            playsInline
-                            className="absolute inset-0 w-full h-full object-cover z-0"
-                          />
-                        )}
+                        {pinLinkStatus.success ? <CheckCircle2 size={13} /> : <X size={13} />}
+                        <span>{pinLinkStatus.msg}</span>
+                      </div>
+                    )}
+                  </div>
 
-                        {/* Top Badges */}
-                        <div className="absolute top-1.5 left-1.5 right-1.5 flex items-center justify-between pointer-events-none">
-                          <span
-                            className={`px-1.5 py-0.5 text-[9px] font-extrabold rounded uppercase tracking-wider ${
-                              w.type === 'video'
-                                ? 'bg-emerald-500/90 text-white shadow-sm'
-                                : 'bg-black/70 text-zinc-300 border border-white/10'
+                  {/* Pinterest Search Query & Filters */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sc-text-secondary" />
+                        <input
+                          type="text"
+                          value={pinterestQuery}
+                          onChange={(e) => setPinterestQuery(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSearchPinterest();
+                          }}
+                          placeholder={t('pinterestSearchPlaceholder')}
+                          className="w-full rounded-sc border border-sc-border bg-[#161616] py-2 pl-8 pr-3 text-xs text-white placeholder:text-sc-text-secondary/60 focus:border-[#E60023] focus:outline-none"
+                        />
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          const nextAnim = !pinterestAnimated;
+                          setPinterestAnimated(nextAnim);
+                          if (pinterestQuery.trim()) {
+                            handleSearchPinterest(pinterestQuery, nextAnim);
+                          }
+                        }}
+                        className={`px-3 py-2 rounded-sc border text-xs font-bold transition-colors flex items-center gap-1.5 shrink-0 ${
+                          pinterestAnimated
+                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
+                            : 'bg-[#181818] border-sc-border text-sc-text-secondary hover:text-white'
+                        }`}
+                        title="Фильтровать только живые/анимированные зацикленные обои"
+                      >
+                        <Film size={13} />
+                        <span>Live / GIF</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleSearchPinterest()}
+                        disabled={pinterestLoading}
+                        className="px-4 py-2 rounded-sc bg-[#E60023] hover:bg-[#ad081b] text-white text-xs font-bold transition-colors flex items-center gap-1.5 disabled:opacity-50 shrink-0 shadow-md shadow-[#E60023]/20"
+                      >
+                        {pinterestLoading ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <Search size={13} />
+                        )}
+                        <span>{t('pinterestSearch')}</span>
+                      </button>
+                    </div>
+
+                    {/* Aesthetic Fast-Tags */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                      {AESTHETIC_SEARCH_TAGS.map((tag) => (
+                        <button
+                          key={tag}
+                          onClick={() => {
+                            setPinterestQuery(tag);
+                            handleSearchPinterest(tag);
+                          }}
+                          className="px-2.5 py-1 text-[10px] font-bold rounded-sc whitespace-nowrap bg-[#181818] border border-sc-border text-sc-text-secondary hover:text-white hover:border-[#E60023]/50 transition-colors"
+                        >
+                          #{tag}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Pinterest Search Results Grid */}
+                  {pinterestLoading ? (
+                    <div className="flex flex-col items-center justify-center py-16 gap-3 text-sc-text-secondary">
+                      <Loader2 size={28} className="animate-spin text-[#E60023]" />
+                      <span className="text-xs font-medium">Поиск эстетичных оригиналов с Pinterest...</span>
+                    </div>
+                  ) : pinterestError ? (
+                    <div className="p-4 rounded-sc bg-[#181818] border border-sc-border text-center space-y-1">
+                      <p className="text-xs text-sc-text-secondary">{pinterestError}</p>
+                      <button
+                        onClick={() => handleSearchPinterest('Cyberpunk Neon 4K')}
+                        className="text-xs text-[#E60023] hover:underline font-semibold"
+                      >
+                        Попробовать: #Cyberpunk Neon 4K
+                      </button>
+                    </div>
+                  ) : pinterestResults.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[340px] overflow-y-auto pr-1">
+                      {pinterestResults.map((item) => {
+                        const isSelected = bgConfig.url === item.url;
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={() =>
+                              handleApplyBackground({
+                                ...bgConfig,
+                                type: item.type,
+                                url: item.url,
+                              })
+                            }
+                            className={`group cursor-pointer rounded-sc border overflow-hidden relative aspect-video transition-all hover:scale-[1.02] shadow-md ${
+                              isSelected
+                                ? 'border-[#E60023] ring-2 ring-[#E60023] shadow-[#E60023]/25'
+                                : 'border-sc-border hover:border-[#E60023]/60'
                             }`}
                           >
-                            {w.type === 'video' ? 'LIVE' : '4K'}
-                          </span>
+                            <img
+                              src={item.thumbnail || item.url}
+                              alt={item.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              loading="lazy"
+                            />
 
-                          {isSelected && (
-                            <span className="h-5 w-5 rounded-full bg-sc-accent text-white flex items-center justify-center shadow-md">
-                              <Check size={12} />
-                            </span>
-                          )}
-                        </div>
+                            {/* Top Badge */}
+                            <div className="absolute top-1.5 left-1.5 right-1.5 flex items-center justify-between pointer-events-none">
+                              <span className="px-1.5 py-0.5 text-[9px] font-extrabold rounded uppercase tracking-wider bg-black/70 text-zinc-300 border border-white/10">
+                                {item.type === 'video' ? 'VIDEO' : item.width ? `${item.width}x${item.height}` : 'HD'}
+                              </span>
 
-                        {/* Bottom Overlay Title */}
-                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-2 flex flex-col justify-end pointer-events-none">
-                          <span className="text-[11px] font-bold text-white leading-tight truncate">
-                            {w.name}
-                          </span>
-                          <span className="text-[9px] text-sc-text-secondary/90 truncate mt-0.5">
-                            {w.category} &bull; {w.author || 'Pinterest'}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                              {isSelected && (
+                                <span className="h-5 w-5 rounded-full bg-[#E60023] text-white flex items-center justify-center shadow-md">
+                                  <Check size={12} />
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Bottom Title & Apply Hint */}
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-2 flex flex-col justify-end pointer-events-none">
+                              <span className="text-[11px] font-bold text-white leading-tight truncate">
+                                {item.title}
+                              </span>
+                              <span className="text-[9px] text-[#E60023] font-bold mt-0.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Sparkles size={9} /> {t('pinterestApplyWallpaper')}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center rounded-sc border border-dashed border-sc-border bg-[#141414] space-y-2">
+                      <Compass size={24} className="mx-auto text-sc-text-secondary" />
+                      <p className="text-xs text-sc-text-secondary">
+                        Введите поисковый запрос или выберите эстетичный тег выше для поиска обоев в Pinterest
+                      </p>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 <div className="rounded-sc border border-sc-border bg-[#141414] p-4 flex flex-col justify-between">

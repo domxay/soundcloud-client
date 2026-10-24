@@ -45,4 +45,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   moveOverlay: (deltaX, deltaY) => ipcRenderer.send('sc:overlay-move', { deltaX, deltaY }),
   restoreMainWindow: () => ipcRenderer.invoke('sc:restore-main-window'),
   toggleOverlay: (show) => ipcRenderer.invoke('sc:toggle-overlay', show),
+
+  // Pinterest Wallpaper Search & Resolver
+  searchPinterest: (query, animated) => ipcRenderer.invoke('sc:search-pinterest', query, animated),
+  resolvePinterestUrl: (url) => ipcRenderer.invoke('sc:resolve-pinterest-url', url),
 });
