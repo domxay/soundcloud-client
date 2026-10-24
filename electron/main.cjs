@@ -789,7 +789,6 @@ ipcMain.handle('sc:resolve-pinterest-url', async (event, pinUrl) => {
     return { success: false, error: err.message || 'Resolve failed' };
   }
 });
-});
 
 ipcMain.handle('sc:window-minimize', () => {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.minimize();
